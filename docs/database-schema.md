@@ -1,339 +1,498 @@
-# AI Business Assistant Platform - Database Schema Design
+# Enterprise AI Knowledge Platform - Database Schema Design
 
-This schema supports an Enterprise AI Knowledge and Automation Platform:
-- workspace-scoped knowledge management,
-- connector-driven ingestion,
-- knowledge engine retrieval,
-- agent orchestration and tools,
-- and full AI request traceability.
+This document defines the **database design blueprint** (not ORM code) for an enterprise-ready SaaS platform.
 
----
-
-## 1) Design Principles
-
-1. **Tenant isolation**: all tenant-owned data includes `company_id`
-2. **Workspace isolation**: operational entities include `workspace_id`
-3. **Knowledge-centric model**: assistants consume knowledge, do not own it
-4. **Agent + tool readiness**: schema supports multi-tool execution traces
-5. **Provider agnosticism**: model/provider selection is configuration data
-6. **MVP realism**: only PDF connector is implemented; broader source catalog is architecture-ready
+It is designed for:
+- multi-tenant SaaS with strict company isolation,
+- workspace segmentation,
+- reusable knowledge systems,
+- assistant + agent orchestration,
+- tool execution tracing,
+- future subscription and usage billing.
 
 ---
 
-## 2) Core Tenancy and Identity Entities
+## 1) Core Design Principles
 
-## Company
+1. **Membership-based identity**  
+   Users are not directly attached to a single company. Access is granted through memberships.
+2. **Tenant isolation by company**  
+   All tenant-owned operational entities include `company_id`.
+3. **Workspace boundary inside company**  
+   Most runtime entities also include `workspace_id`.
+4. **Knowledge abstraction first**  
+   Do not assume all sources are files; model sources and assets generically.
+5. **Traceability by default**  
+   AI requests, retrievals, tool calls, and messages are persisted for audit/debug.
+6. **Soft-deletion friendly**  
+   Business entities support `deleted_at` for recovery and compliance workflows.
+
+---
+
+## 2) Cross-Cutting Column Conventions
+
+Recommended on nearly all business entities:
 - `id` (uuid, pk)
-- `name` (text, not null)
-- `created_at`, `updated_at`
+- `created_at` (timestamptz, not null)
+- `updated_at` (timestamptz, not null)
+- `deleted_at` (timestamptz, nullable, for soft delete)
+
+Tenant columns:
+- `company_id` required for tenant-owned records.
+- `workspace_id` required for workspace-owned records.
+
+---
+
+## 3) Identity Domain
 
 ## User
-- `id` (uuid, pk)
-- `company_id` (uuid, fk -> company.id, indexed)
-- `email` (text/citext, not null)
-- `password_hash` (text, not null)
-- `role` (enum: `OWNER`, `ADMIN`, `MEMBER`)
-- `created_at`, `updated_at`
+- **Purpose**: Global user identity across companies.
+- **Main fields**:
+  - `id`, `email` (global unique), `password_hash`
+  - `display_name`, `avatar_url`
+  - `status` (`ACTIVE`, `INVITED`, `SUSPENDED`)
+  - timestamps + soft delete
+- **Relationships**:
+  - 1..n `Membership`
+  - 1..n `Conversation`, `Message`, `AIRequest`, `AgentExecution`
+- **Important indexes**:
+  - unique (`email`)
+  - (`status`)
+- **Multi-tenant considerations**:
+  - user exists outside company; tenant access always resolved through membership.
 
-Suggested constraints:
-- unique (`company_id`, `email`)
+## Company
+- **Purpose**: Primary tenant boundary.
+- **Main fields**:
+  - `id`, `name`, `slug`, `status`
+  - `settings_json` (policy/config)
+  - timestamps + soft delete
+- **Relationships**:
+  - 1..n `Membership`
+  - 1..n `Workspace`
+  - 1..n tenant-scoped operational entities
+- **Important indexes**:
+  - unique (`slug`)
+  - (`status`)
+- **Multi-tenant considerations**:
+  - primary data partition key.
+
+## Membership
+- **Purpose**: User-company association with role and lifecycle.
+- **Main fields**:
+  - `id`, `user_id`, `company_id`
+  - `role_id` (or role enum reference)
+  - `status` (`PENDING`, `ACTIVE`, `REMOVED`)
+  - `invited_by_user_id`, `joined_at`
+  - timestamps + soft delete
+- **Relationships**:
+  - n..1 `User`
+  - n..1 `Company`
+  - n..1 `Role`
+  - 1..n `WorkspaceMembership`
+- **Important indexes**:
+  - unique (`user_id`, `company_id`) where `deleted_at is null`
+  - (`company_id`, `status`)
+- **Multi-tenant considerations**:
+  - canonical tenant access record.
+
+## Role
+- **Purpose**: Reusable permission bundle (company-level or platform-level).
+- **Main fields**:
+  - `id`, `company_id` (nullable for global default roles)
+  - `name`, `description`, `is_system_role`
+  - timestamps + soft delete
+- **Relationships**:
+  - 1..n `Membership`
+  - n..m `Permission` (via `RolePermission`)
+- **Important indexes**:
+  - unique (`company_id`, `name`) where `deleted_at is null`
+- **Multi-tenant considerations**:
+  - supports tenant custom roles and shared defaults.
+
+## Permission
+- **Purpose**: Atomic authorization capability.
+- **Main fields**:
+  - `id`, `key` (e.g., `knowledge.read`), `description`, timestamps
+- **Relationships**:
+  - n..m with `Role` via `RolePermission`
+- **Important indexes**:
+  - unique (`key`)
+- **Multi-tenant considerations**:
+  - typically platform-scoped dictionary.
+
+## RolePermission
+- **Purpose**: Role-to-permission join table.
+- **Main fields**:
+  - `role_id`, `permission_id`, timestamps
+- **Important indexes**:
+  - unique (`role_id`, `permission_id`)
+
+## WorkspaceMembership
+- **Purpose**: Workspace-level access derived from company membership.
+- **Main fields**:
+  - `id`, `membership_id`, `workspace_id`
+  - `workspace_role` (`ADMIN`, `MEMBER`, `VIEWER`)
+  - timestamps + soft delete
+- **Important indexes**:
+  - unique (`membership_id`, `workspace_id`) where `deleted_at is null`
+
+---
+
+## 4) Workspace Domain
 
 ## Workspace
-- `id` (uuid, pk)
-- `company_id` (uuid, fk -> company.id, indexed)
-- `name` (text, not null)
-- `description` (text)
-- `created_at`, `updated_at`
-
-Suggested constraints:
-- unique (`company_id`, `name`)
-
-## WorkspaceMember
-- `id` (uuid, pk)
-- `company_id` (uuid, indexed)
-- `workspace_id` (uuid, fk -> workspace.id, indexed)
-- `user_id` (uuid, fk -> user.id, indexed)
-- `workspace_role` (enum/text: `WORKSPACE_ADMIN`, `WORKSPACE_MEMBER`)
-- `created_at`
-
-Suggested constraints:
-- unique (`workspace_id`, `user_id`)
+- **Purpose**: Sub-tenant boundary (e.g., HR, Engineering, Support).
+- **Main fields**:
+  - `id`, `company_id`
+  - `name`, `slug`, `description`
+  - `status`
+  - timestamps + soft delete
+- **Relationships**:
+  - n..1 `Company`
+  - 1..n `KnowledgeBase`, `Assistant`, runtime entities
+- **Important indexes**:
+  - unique (`company_id`, `slug`) where `deleted_at is null`
+  - (`company_id`, `status`)
+- **Multi-tenant considerations**:
+  - all workspace data must match workspace.company_id lineage.
 
 ---
 
-## 3) Knowledge Management Entities
+## 5) Knowledge Domain
 
 ## KnowledgeBase
-- `id` (uuid, pk)
-- `company_id` (uuid, indexed)
-- `workspace_id` (uuid, indexed)
-- `name` (text)
-- `description` (text)
-- `status` (enum: `ACTIVE`, `ARCHIVED`)
-- `created_at`, `updated_at`
+- **Purpose**: Curated knowledge container within workspace.
+- **Main fields**:
+  - `id`, `company_id`, `workspace_id`
+  - `name`, `description`, `status`
+  - timestamps + soft delete
+- **Relationships**:
+  - n..1 `Workspace`
+  - 1..n `Collection`, `KnowledgeSource`, `KnowledgeAsset`
+  - n..m with `Assistant` via `AssistantKnowledgeBase`
+- **Important indexes**:
+  - unique (`workspace_id`, `name`) where `deleted_at is null`
+  - (`company_id`, `workspace_id`, `status`)
 
 ## Collection
-- `id` (uuid, pk)
-- `company_id` (uuid, indexed)
-- `workspace_id` (uuid, indexed)
-- `knowledge_base_id` (uuid, fk -> knowledge_base.id, indexed)
-- `name` (text)
-- `description` (text)
-- `created_at`, `updated_at`
+- **Purpose**: Logical grouping for filtering/retrieval policies.
+- **Main fields**:
+  - `id`, `company_id`, `workspace_id`, `knowledge_base_id`
+  - `name`, `description`, `status`
+  - timestamps + soft delete
+- **Relationships**:
+  - n..1 `KnowledgeBase`
+  - 1..n `KnowledgeAsset`
+- **Important indexes**:
+  - unique (`knowledge_base_id`, `name`) where `deleted_at is null`
+  - (`company_id`, `workspace_id`, `knowledge_base_id`)
 
 ## KnowledgeSource
-- `id` (uuid, pk)
-- `company_id` (uuid, indexed)
-- `workspace_id` (uuid, indexed)
-- `knowledge_base_id` (uuid, fk -> knowledge_base.id, indexed)
-- `collection_id` (uuid, fk -> collection.id, indexed, nullable)
-- `connector_type` (enum: see source types below)
-- `display_name` (text)
-- `source_uri` (text, nullable)
-- `source_config` (jsonb)              # connector-specific settings
-- `auth_config_ref` (text, nullable)   # reference to encrypted credentials/secrets
-- `sync_mode` (enum/text: `MANUAL`, `SCHEDULED`, `EVENT_DRIVEN`)
-- `sync_status` (enum: `PENDING`, `SYNCING`, `READY`, `FAILED`)
-- `last_synced_at` (timestamptz, nullable)
-- `created_at`, `updated_at`
+- **Purpose**: Connector configuration and sync boundary (not necessarily a file).
+- **Main fields**:
+  - `id`, `company_id`, `workspace_id`, `knowledge_base_id`
+  - `collection_id` (nullable default target)
+  - `source_type` (`PDF`, `DOCX`, `EXCEL`, `CSV`, `WEBSITE`, `API`, `DATABASE`, etc.)
+  - `display_name`, `source_ref` (URI/id), `config_json`
+  - `auth_ref` (secret manager reference)
+  - `sync_mode`, `sync_status`, `last_synced_at`, `last_error`
+  - timestamps + soft delete
+- **Relationships**:
+  - n..1 `KnowledgeBase`
+  - 1..n `KnowledgeAsset`
+- **Important indexes**:
+  - (`company_id`, `workspace_id`, `source_type`)
+  - (`knowledge_base_id`, `sync_status`)
 
-## KnowledgeItem
-Canonical normalized knowledge object independent of source format.
-- `id` (uuid, pk)
-- `company_id` (uuid, indexed)
-- `workspace_id` (uuid, indexed)
-- `knowledge_base_id` (uuid, indexed)
-- `collection_id` (uuid, indexed, nullable)
-- `knowledge_source_id` (uuid, fk -> knowledge_source.id, indexed)
-- `title` (text)
-- `mime_type` (text)
-- `raw_location` (text, nullable)      # file path, URL, object key, etc.
-- `checksum` (text, nullable)
-- `status` (enum: `UPLOADED`, `PROCESSING`, `READY`, `FAILED`)
-- `metadata` (jsonb)                   # source-native metadata
-- `created_at`, `updated_at`
+## KnowledgeAsset
+- **Purpose**: Canonical ingested unit from any source (file, web page, API record, DB rowset snapshot).
+- **Main fields**:
+  - `id`, `company_id`, `workspace_id`, `knowledge_base_id`, `knowledge_source_id`
+  - `collection_id` (nullable)
+  - `asset_type` (`FILE`, `WEB_PAGE`, `API_OBJECT`, `DB_RECORDSET`, `MESSAGE`, etc.)
+  - `title`, `external_id`, `version_hash`
+  - `mime_type` (nullable), `storage_uri` (nullable)
+  - `metadata_json`
+  - `ingestion_status`, `ingested_at`
+  - timestamps + soft delete
+- **Relationships**:
+  - n..1 `KnowledgeSource`
+  - 1..n `Chunk`, `DocumentMetadata`
+- **Important indexes**:
+  - (`company_id`, `workspace_id`, `knowledge_base_id`)
+  - (`knowledge_source_id`, `external_id`)
+  - (`ingestion_status`)
 
-## KnowledgeChunk
-- `id` (uuid, pk)
-- `company_id` (uuid, indexed)
-- `workspace_id` (uuid, indexed)
-- `knowledge_base_id` (uuid, indexed)
-- `collection_id` (uuid, indexed, nullable)
-- `knowledge_item_id` (uuid, fk -> knowledge_item.id, indexed)
-- `chunk_index` (int, not null)
-- `content` (text, not null)
-- `token_count` (int, nullable)
-- `embedding` (vector(N))
-- `rank_score` (float, nullable)
-- `metadata` (jsonb)                   # page, section, timestamps, speaker, etc.
-- `created_at`
+## DocumentMetadata
+- **Purpose**: File/document-specific details for assets that are files.
+- **Main fields**:
+  - `id`, `knowledge_asset_id`
+  - `filename`, `file_extension`, `file_size_bytes`
+  - `checksum`, `page_count` (nullable), `language` (nullable)
+  - timestamps + soft delete
+- **Relationships**:
+  - n..1 `KnowledgeAsset`
+- **Important indexes**:
+  - unique (`knowledge_asset_id`) where `deleted_at is null`
+  - (`checksum`)
 
-Indexes:
-- vector index on `embedding` (HNSW/IVFFlat)
-- btree (`company_id`, `workspace_id`, `knowledge_base_id`)
-- btree (`collection_id`)
-- unique (`knowledge_item_id`, `chunk_index`)
+## Chunk
+- **Purpose**: Retrieval unit generated from a knowledge asset.
+- **Main fields**:
+  - `id`, `company_id`, `workspace_id`, `knowledge_base_id`, `knowledge_asset_id`
+  - `collection_id` (nullable)
+  - `chunk_index`, `content`, `token_count`
+  - `metadata_json` (page/section/time range/speaker)
+  - timestamps + soft delete
+- **Relationships**:
+  - n..1 `KnowledgeAsset`
+  - 1..n `Embedding`
+  - n..m retrieval references via `RetrievedContext`
+- **Important indexes**:
+  - unique (`knowledge_asset_id`, `chunk_index`) where `deleted_at is null`
+  - (`company_id`, `workspace_id`, `knowledge_base_id`)
+
+## Embedding
+- **Purpose**: Vector representation for a chunk (supports multi-model re-embedding).
+- **Main fields**:
+  - `id`, `company_id`, `workspace_id`, `chunk_id`
+  - `provider`, `model`, `dimension`
+  - `vector` (pgvector)
+  - `is_active`, timestamps + soft delete
+- **Relationships**:
+  - n..1 `Chunk`
+- **Important indexes**:
+  - (`chunk_id`, `is_active`)
+  - (`company_id`, `workspace_id`, `provider`, `model`)
+  - vector index on `vector` (HNSW/IVFFlat)
 
 ---
 
-## 4) Assistant, Agent, and Tool Entities
+## 6) Assistant Domain
 
 ## Assistant
-- `id` (uuid, pk)
-- `company_id` (uuid, indexed)
-- `workspace_id` (uuid, indexed)
-- `name` (text, not null)
-- `description` (text)
-- `default_system_prompt` (text)
-- `provider_config` (jsonb)            # model/provider defaults
-- `agent_config` (jsonb)               # tool permissions, orchestration rules
-- `created_at`, `updated_at`
+- **Purpose**: Configured AI assistant inside workspace.
+- **Main fields**:
+  - `id`, `company_id`, `workspace_id`
+  - `name`, `description`, `status`
+  - `system_prompt`
+  - `ai_configuration_id`
+  - timestamps + soft delete
+- **Relationships**:
+  - n..1 `Workspace`
+  - n..m `KnowledgeBase` via `AssistantKnowledgeBase`
+  - n..m `Tool` via `AssistantTool`
+  - 1..n `Conversation`, `AIRequest`, `AgentExecution`
+- **Important indexes**:
+  - unique (`workspace_id`, `name`) where `deleted_at is null`
+  - (`company_id`, `workspace_id`, `status`)
+
+## AIConfiguration
+- **Purpose**: Provider/model/runtime settings reused by assistants.
+- **Main fields**:
+  - `id`, `company_id`, `workspace_id`
+  - `provider` (`OLLAMA`, `OPENAI`, `ANTHROPIC`, etc.)
+  - `model`, `temperature`, `max_tokens`
+  - `embedding_provider`, `embedding_model`
+  - `config_json`
+  - timestamps + soft delete
+- **Relationships**:
+  - 1..n `Assistant`
+- **Important indexes**:
+  - (`company_id`, `workspace_id`, `provider`, `model`)
 
 ## AssistantKnowledgeBase
-- `id` (uuid, pk)
-- `company_id` (uuid, indexed)
-- `workspace_id` (uuid, indexed)
-- `assistant_id` (uuid, fk -> assistant.id, indexed)
-- `knowledge_base_id` (uuid, fk -> knowledge_base.id, indexed)
-- `is_primary` (boolean, default false)
-- `created_at`
+- **Purpose**: Attach multiple knowledge bases to assistant.
+- **Main fields**:
+  - `id`, `company_id`, `workspace_id`
+  - `assistant_id`, `knowledge_base_id`
+  - `priority`, `is_default`
+  - timestamps + soft delete
+- **Important indexes**:
+  - unique (`assistant_id`, `knowledge_base_id`) where `deleted_at is null`
+  - (`company_id`, `workspace_id`)
 
-## ToolDefinition
-- `id` (uuid, pk)
-- `company_id` (uuid, indexed, nullable)     # null for global/platform tools
-- `workspace_id` (uuid, indexed, nullable)
-- `name` (text, not null)
-- `tool_type` (enum: `KNOWLEDGE_SEARCH`, `WEB_SEARCH`, `REST_API`, `DATABASE_QUERY`, `CALCULATOR`, `EMAIL`, `CALENDAR`, `CRM`, `ERP`, `MCP`, `CUSTOM`)
-- `description` (text)
-- `config_schema` (jsonb)                    # expected input/output schema hints
-- `execution_config` (jsonb)                 # endpoint/query/runtime settings
-- `status` (enum: `ACTIVE`, `DISABLED`)
-- `created_at`, `updated_at`
+## Tool
+- **Purpose**: Executable tool definition (knowledge search, web search, API, DB, etc.).
+- **Main fields**:
+  - `id`, `company_id`, `workspace_id` (nullable for global tools)
+  - `name`, `tool_type`, `description`
+  - `input_schema_json`, `output_schema_json`
+  - `execution_config_json`, `status`
+  - timestamps + soft delete
+- **Relationships**:
+  - n..m with assistants via `AssistantTool`
+  - 1..n `ToolExecution`
+- **Important indexes**:
+  - unique (`workspace_id`, `name`) where `deleted_at is null`
+  - (`tool_type`, `status`)
 
-## ToolCredential
-- `id` (uuid, pk)
-- `company_id` (uuid, indexed)
-- `workspace_id` (uuid, indexed, nullable)
-- `tool_definition_id` (uuid, fk -> tool_definition.id, indexed)
-- `credential_ref` (text, not null)          # secret reference, not raw secret
-- `created_at`, `updated_at`
+## AssistantTool
+- **Purpose**: Assistant-specific tool enablement and policy.
+- **Main fields**:
+  - `id`, `company_id`, `workspace_id`
+  - `assistant_id`, `tool_id`
+  - `is_enabled`, `policy_json`
+  - timestamps + soft delete
+- **Important indexes**:
+  - unique (`assistant_id`, `tool_id`) where `deleted_at is null`
+
+---
+
+## 7) Agent Domain
 
 ## Conversation
-- `id` (uuid, pk)
-- `company_id` (uuid, indexed)
-- `workspace_id` (uuid, indexed)
-- `assistant_id` (uuid, indexed)
-- `user_id` (uuid, indexed)
-- `question` (text)
-- `answer` (text)
-- `created_at`
+- **Purpose**: Thread container for user-assistant interaction.
+- **Main fields**:
+  - `id`, `company_id`, `workspace_id`, `assistant_id`, `user_id`
+  - `title`, `status`
+  - timestamps + soft delete
+- **Relationships**:
+  - 1..n `Message`
+  - 1..n `AIRequest`
+- **Important indexes**:
+  - (`assistant_id`, `created_at`)
+  - (`user_id`, `created_at`)
 
-## ConversationSource
-- `id` (uuid, pk)
-- `company_id` (uuid, indexed)
-- `workspace_id` (uuid, indexed)
-- `conversation_id` (uuid, indexed)
-- `knowledge_item_id` (uuid, indexed, nullable)
-- `knowledge_chunk_id` (uuid, indexed, nullable)
-- `similarity_score` (float, nullable)
-- `citation_text` (text, nullable)
+## Message
+- **Purpose**: Individual turn in conversation (user/system/assistant/tool).
+- **Main fields**:
+  - `id`, `company_id`, `workspace_id`, `conversation_id`
+  - `role` (`USER`, `ASSISTANT`, `SYSTEM`, `TOOL`)
+  - `content`, `metadata_json`
+  - `created_by_user_id` (nullable), `created_by_tool_id` (nullable)
+  - timestamps + soft delete
+- **Important indexes**:
+  - (`conversation_id`, `created_at`)
 
-## AgentRun
-- `id` (uuid, pk)
-- `company_id` (uuid, indexed)
-- `workspace_id` (uuid, indexed)
-- `assistant_id` (uuid, indexed)
-- `conversation_id` (uuid, indexed, nullable)
-- `user_id` (uuid, indexed, nullable)
-- `question` (text, not null)
-- `intent` (text, not null)
-- `execution_plan` (jsonb, not null)
-- `status` (enum: `PENDING`, `RUNNING`, `COMPLETED`, `FAILED`)
-- `started_at`, `ended_at`
+## AIRequest
+- **Purpose**: One orchestrated request lifecycle for debugging/audit.
+- **Main fields**:
+  - `id`, `company_id`, `workspace_id`, `assistant_id`, `conversation_id`, `user_id`
+  - `question`, `intent`
+  - `final_prompt`, `model_provider`, `model_name`
+  - `response_text`, `status`, `error_json`
+  - `latency_ms`, `prompt_tokens`, `completion_tokens`, `total_tokens`
+  - `feedback` (`POSITIVE`, `NEGATIVE`, `NONE`)
+  - timestamps + soft delete
+- **Relationships**:
+  - 1..n `AgentExecution`, `RetrievedContext`
+- **Important indexes**:
+  - (`company_id`, `workspace_id`, `created_at`)
+  - (`assistant_id`, `created_at`)
+  - (`status`)
+
+## AgentExecution
+- **Purpose**: Planner/executor run associated with one AI request.
+- **Main fields**:
+  - `id`, `company_id`, `workspace_id`, `ai_request_id`
+  - `plan_json`, `execution_status`
+  - `started_at`, `ended_at`
+  - timestamps + soft delete
+- **Relationships**:
+  - n..1 `AIRequest`
+  - 1..n `ToolExecution`
+- **Important indexes**:
+  - (`ai_request_id`, `execution_status`)
 
 ## ToolExecution
-- `id` (uuid, pk)
-- `company_id` (uuid, indexed)
-- `workspace_id` (uuid, indexed)
-- `agent_run_id` (uuid, fk -> agent_run.id, indexed)
-- `tool_definition_id` (uuid, fk -> tool_definition.id, indexed)
-- `input_payload` (jsonb)
-- `output_payload` (jsonb, nullable)
-- `status` (enum: `PENDING`, `RUNNING`, `SUCCEEDED`, `FAILED`, `SKIPPED`)
-- `error_message` (text, nullable)
-- `started_at`, `ended_at`
+- **Purpose**: Trace one tool call within agent execution.
+- **Main fields**:
+  - `id`, `company_id`, `workspace_id`, `agent_execution_id`, `tool_id`
+  - `step_index`, `input_json`, `output_json`
+  - `status`, `error_message`
+  - `started_at`, `ended_at`
+  - timestamps + soft delete
+- **Relationships**:
+  - n..1 `AgentExecution`
+  - n..1 `Tool`
+- **Important indexes**:
+  - (`agent_execution_id`, `step_index`)
+  - (`tool_id`, `created_at`)
+
+## RetrievedContext
+- **Purpose**: Evidence records for what knowledge was used.
+- **Main fields**:
+  - `id`, `company_id`, `workspace_id`, `ai_request_id`
+  - `knowledge_base_id`, `knowledge_asset_id`, `chunk_id`, `embedding_id` (nullable)
+  - `retrieval_score`, `rank`, `citation_text`
+  - `retrieval_method` (`VECTOR`, `HYBRID`, `KEYWORD`, etc.)
+  - timestamps + soft delete
+- **Relationships**:
+  - n..1 `AIRequest`
+  - references knowledge entities
+- **Important indexes**:
+  - (`ai_request_id`, `rank`)
+  - (`chunk_id`)
 
 ---
 
-## 5) Observability and Traceability Entities
+## 8) Subscription Domain (Future-Ready)
 
-## AIRequestLog
-- `id` (uuid, pk)
-- `company_id` (uuid, indexed)
-- `workspace_id` (uuid, indexed)
-- `assistant_id` (uuid, indexed, nullable)
-- `user_id` (uuid, indexed, nullable)
-- `conversation_id` (uuid, indexed, nullable)
-- `agent_run_id` (uuid, indexed, nullable)
-- `question` (text, not null)
-- `intent` (text, not null)
-- `selected_tools` (jsonb, not null)
-- `retrieved_knowledge` (jsonb, not null)
-- `prompt` (text, not null)
-- `provider` (text, not null)
-- `model` (text, not null)
-- `response` (text, nullable)
-- `latency_ms` (int, nullable)
-- `prompt_tokens` (int, nullable)
-- `completion_tokens` (int, nullable)
-- `total_tokens` (int, nullable)
-- `errors` (jsonb, nullable)
-- `feedback` (enum/text: `POSITIVE`, `NEGATIVE`, `NONE`, nullable)
-- `created_at` (timestamptz, default now)
+## Plan
+- **Purpose**: Plan catalog (FREE/PRO/ENTERPRISE).
+- **Main fields**:
+  - `id`, `code`, `name`, `description`
+  - `limits_json` (assistants, storage, requests, etc.)
+  - timestamps + soft delete
+- **Important indexes**:
+  - unique (`code`)
 
-Indexes:
-- (`company_id`, `workspace_id`, `created_at`)
-- (`assistant_id`, `created_at`)
-- (`agent_run_id`)
+## Subscription
+- **Purpose**: Company plan assignment and lifecycle.
+- **Main fields**:
+  - `id`, `company_id`, `plan_id`
+  - `status` (`TRIAL`, `ACTIVE`, `PAST_DUE`, `CANCELED`)
+  - `starts_at`, `ends_at`, `trial_ends_at`
+  - `billing_provider_ref` (nullable)
+  - timestamps + soft delete
+- **Relationships**:
+  - n..1 `Company`, n..1 `Plan`
+  - 1..n `UsageRecord`
+- **Important indexes**:
+  - (`company_id`, `status`)
+  - (`plan_id`, `status`)
 
----
-
-## 6) Connector and Source Type Enumeration
-
-`KnowledgeSourceType` / `connector_type` values:
-- `PDF`
-- `DOCX`
-- `TXT`
-- `MARKDOWN`
-- `EXCEL`
-- `POWERPOINT`
-- `CSV`
-- `IMAGE_OCR`
-- `AUDIO_TRANSCRIPT`
-- `VIDEO_TRANSCRIPT`
-- `WEBSITE`
-- `NOTION`
-- `CONFLUENCE`
-- `SHAREPOINT`
-- `GOOGLE_DRIVE`
-- `ONEDRIVE`
-- `GITHUB`
-- `JIRA`
-- `SLACK`
-- `MICROSOFT_TEAMS`
-- `EMAIL`
-- `SQL_DATABASE`
-- `REST_API`
-- `GRAPHQL_API`
-- `CUSTOM`
-
-MVP implementation:
-- `PDF` only
+## UsageRecord
+- **Purpose**: Metered usage for future billing/quotas.
+- **Main fields**:
+  - `id`, `company_id`, `workspace_id` (nullable), `subscription_id`
+  - `metric_key` (`ai_request`, `embedding_tokens`, `storage_bytes`, etc.)
+  - `quantity`, `recorded_at`
+  - `source_entity_type`, `source_entity_id`
+  - timestamps + soft delete
+- **Important indexes**:
+  - (`company_id`, `metric_key`, `recorded_at`)
+  - (`subscription_id`, `recorded_at`)
 
 ---
 
-## 7) Tenant and Workspace Isolation Rules
+## 9) Tenant Isolation and Consistency Rules
 
-Required constraints:
-- all tenant entities include `company_id`
-- workspace-owned entities include `workspace_id`
-- all repository queries enforce scoped predicates
+Mandatory consistency checks:
+- workspace.company_id == company.id
+- all workspace entities share the same `company_id` + `workspace_id`
+- assistant links only to knowledge bases/tools in same workspace (unless explicit global tool policy)
+- retrieved contexts only reference chunks/assets from same tenant boundary
 
-Consistency checks:
-- workspace belongs to company
-- knowledge base belongs to workspace/company
-- collection/source/item/chunk share same company/workspace lineage
-- assistant and linked knowledge bases belong to same workspace
-- tool executions and agent runs stay in workspace boundary
+Query rules:
+- all queries include tenant filter (`company_id`)
+- workspace-level APIs include `workspace_id`
+- soft-deleted rows excluded by default (`deleted_at is null`)
 
-Optional hardening:
-- PostgreSQL RLS policies for company/workspace
-
----
-
-## 8) Relationship Summary
-
-- Company 1..n Users
-- Company 1..n Workspaces
-- Workspace 1..n KnowledgeBases
-- KnowledgeBase 1..n Collections
-- Collection 1..n KnowledgeSources
-- KnowledgeSource 1..n KnowledgeItems
-- KnowledgeItem 1..n KnowledgeChunks
-- Workspace 1..n Assistants
-- Assistant n..m KnowledgeBases (via AssistantKnowledgeBase)
-- Assistant 1..n AgentRuns
-- AgentRun 1..n ToolExecutions
-- ToolDefinition 1..n ToolExecutions
-- Assistant 1..n Conversations
-- Conversation 1..n ConversationSources
-- AIRequestLog links conversation, assistant, and agent runs for full traceability
+Hardening options:
+- PostgreSQL Row Level Security (RLS)
+- tenant-aware DB roles for enterprise-dedicated environments
 
 ---
 
-## 9) Prisma and Storage Notes
+## 10) Recommended First Implementation Order (Schema Layer)
 
-- Use UUID primary keys and JSON columns for extensible configs
-- Enable `pgvector` with raw migration SQL
-- Keep vector similarity queries in repository-level raw SQL where needed
-- Store connector credentials in secret manager; DB keeps references only
+1. Identity foundation: `User`, `Company`, `Membership`, `Role`, `Permission`
+2. Workspace layer: `Workspace`, `WorkspaceMembership`
+3. Knowledge core: `KnowledgeBase`, `Collection`, `KnowledgeSource`, `KnowledgeAsset`
+4. Retrieval core: `Chunk`, `Embedding`
+5. Assistant core: `AIConfiguration`, `Assistant`, linking tables
+6. Agent tracing: `Conversation`, `Message`, `AIRequest`, `AgentExecution`, `ToolExecution`, `RetrievedContext`
+7. Subscription future layer: `Plan`, `Subscription`, `UsageRecord`
