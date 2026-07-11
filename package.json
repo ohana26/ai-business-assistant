@@ -1,0 +1,22 @@
+{
+  "name": "ai-business-assistant",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Enterprise AI Knowledge and Automation Platform monorepo",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "echo \"No apps scaffolded yet. Next step initializes frontend/backend.\"",
+    "build": "echo \"Build scripts will be added after app scaffolding.\"",
+    "test": "echo \"Test scripts will be added after app scaffolding.\"",
+    "lint": "echo \"Lint scripts will be added after app scaffolding.\"",
+    "docker:up": "docker compose -f infrastructure/docker-compose.yml up -d",
+    "docker:down": "docker compose -f infrastructure/docker-compose.yml down",
+    "docker:logs": "docker compose -f infrastructure/docker-compose.yml logs -f"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

@@ -1,0 +1,166 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum UserStatus {
+  ACTIVE
+  INVITED
+  SUSPENDED
+}
+
+enum MembershipStatus {
+  PENDING
+  ACTIVE
+  REMOVED
+}
+
+enum WorkspaceRole {
+  ADMIN
+  MEMBER
+  VIEWER
+}
+
+enum WorkspaceStatus {
+  ACTIVE
+  ARCHIVED
+}
+
+model User {
+  id                  String       @id @default(uuid()) @db.Uuid
+  email               String       @unique
+  passwordHash        String
+  displayName         String?
+  status              UserStatus   @default(ACTIVE)
+  memberships         Membership[]
+  invitedMemberships  Membership[] @relation("MembershipInviter")
+  createdAt           DateTime     @default(now())
+  updatedAt           DateTime     @updatedAt
+  deletedAt           DateTime?
+
+  @@index([status])
+  @@index([deletedAt])
+}
+
+model Company {
+  id          String       @id @default(uuid()) @db.Uuid
+  name        String
+  slug        String       @unique
+  status      String       @default("ACTIVE")
+  memberships Membership[]
+  roles       Role[]
+  workspaces  Workspace[]
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  deletedAt   DateTime?
+
+  @@index([status])
+  @@index([deletedAt])
+}
+
+model Membership {
+  id                   String                @id @default(uuid()) @db.Uuid
+  userId               String                @db.Uuid
+  companyId            String                @db.Uuid
+  roleId               String                @db.Uuid
+  status               MembershipStatus      @default(PENDING)
+  invitedByUserId      String?               @db.Uuid
+  joinedAt             DateTime?
+  user                 User                  @relation(fields: [userId], references: [id], onDelete: Restrict)
+  company              Company               @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  role                 Role                  @relation(fields: [roleId], references: [id], onDelete: Restrict)
+  invitedByUser        User?                 @relation("MembershipInviter", fields: [invitedByUserId], references: [id], onDelete: SetNull)
+  workspaceMemberships WorkspaceMembership[]
+  createdAt            DateTime              @default(now())
+  updatedAt            DateTime              @updatedAt
+  deletedAt            DateTime?
+
+  @@unique([userId, companyId])
+  @@index([companyId, status])
+  @@index([userId, status])
+  @@index([roleId])
+  @@index([deletedAt])
+}
+
+model Role {
+  id              String           @id @default(uuid()) @db.Uuid
+  companyId       String?          @db.Uuid
+  name            String
+  description     String?
+  isSystemRole    Boolean          @default(false)
+  company         Company?         @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  memberships     Membership[]
+  rolePermissions RolePermission[]
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  deletedAt       DateTime?
+
+  @@unique([companyId, name])
+  @@index([companyId, isSystemRole])
+  @@index([deletedAt])
+}
+
+model Permission {
+  id              String           @id @default(uuid()) @db.Uuid
+  key             String           @unique
+  description     String?
+  rolePermissions RolePermission[]
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+}
+
+model RolePermission {
+  id           String     @id @default(uuid()) @db.Uuid
+  roleId       String     @db.Uuid
+  permissionId String     @db.Uuid
+  role         Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  @@unique([roleId, permissionId])
+  @@index([permissionId])
+}
+
+model Workspace {
+  id                   String                @id @default(uuid()) @db.Uuid
+  companyId            String                @db.Uuid
+  name                 String
+  slug                 String
+  description          String?
+  status               WorkspaceStatus       @default(ACTIVE)
+  company              Company               @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  workspaceMemberships WorkspaceMembership[]
+  createdAt            DateTime              @default(now())
+  updatedAt            DateTime              @updatedAt
+  deletedAt            DateTime?
+
+  @@unique([companyId, slug])
+  @@index([companyId, status])
+  @@index([deletedAt])
+}
+
+model WorkspaceMembership {
+  id            String        @id @default(uuid()) @db.Uuid
+  membershipId  String        @db.Uuid
+  workspaceId   String        @db.Uuid
+  workspaceRole WorkspaceRole @default(MEMBER)
+  membership    Membership    @relation(fields: [membershipId], references: [id], onDelete: Restrict)
+  workspace     Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  deletedAt     DateTime?
+
+  @@unique([membershipId, workspaceId])
+  @@index([workspaceId, workspaceRole])
+  @@index([membershipId])
+  @@index([deletedAt])
+}
+
+/// Approved additions (future phases, intentionally not implemented now):
+/// - KnowledgeSyncJob
+/// - AuditLog
+/// - Integration entity between external connections and tools
