@@ -1,69 +1,70 @@
 # AI Business Assistant Platform - System Context Diagram
 
-This diagram shows system boundaries and external dependencies across evolution stages.
+This context diagram models the platform as an enterprise knowledge and automation system.
 
-## Mermaid System Context Diagram (C4-style simplified)
+## Mermaid System Context Diagram
 
 ```mermaid
 flowchart TB
-    U[Business User] --> WEB[Web App\nReact + Vite + TS + MUI]
+    U[Business User] --> WEB[Web App\nReact + Vite + TypeScript]
     A[Company Admin] --> WEB
 
-    WEB --> API[NestJS API\nModular Monolith]
+    WEB --> API[NestJS Platform API\nModular Monolith]
 
-    API --> PG[(PostgreSQL + pgvector)]
-    API --> FS[(Local File Storage\nV1)]
-    API --> OLLAMA[Ollama Runtime\nLLM + Embedding]
+    API --> AGENT[Agent Orchestrator]
+    AGENT --> TOOLS[Tool Framework]
+    AGENT --> KE[Knowledge Engine]
+    AGENT --> LLM[AI Provider Gateway]
 
-    API --> LOGS[(AI Request Log Store\nin PostgreSQL)]
+    KE --> PG[(PostgreSQL + pgvector)]
+    KE --> STORE[(Knowledge Storage\nLocal FS in MVP)]
 
-    subgraph Future Connectors
-      NOTION[Notion]
-      CONF[Confluence]
-      SP[SharePoint]
-      GDRIVE[Google Drive]
-      GH[GitHub]
-      WEBURL[Website URLs]
-    end
+    TOOLS --> WEBSEARCH[Web Search Provider]
+    TOOLS --> INTAPI[Internal APIs]
+    TOOLS --> EXTAPI[External APIs]
+    TOOLS --> DBTOOLS[Databases]
 
-    NOTION -.future connector.-> API
-    CONF -.future connector.-> API
-    SP -.future connector.-> API
-    GDRIVE -.future connector.-> API
-    GH -.future connector.-> API
-    WEBURL -.future connector.-> API
+    API --> CONNECTORS[Connector Runtime]
+    CONNECTORS --> PDF[PDF Source - MVP]
 
-    subgraph Future AI Providers
-      OPENAI[OpenAI]
-      ANTH[Anthropic]
-      AZURE[Azure OpenAI]
-      PRIVATE[Private Model Server]
-    end
+    CONNECTORS -.future.-> NOTION[Notion]
+    CONNECTORS -.future.-> CONF[Confluence]
+    CONNECTORS -.future.-> SP[SharePoint]
+    CONNECTORS -.future.-> GDRIVE[Google Drive]
+    CONNECTORS -.future.-> ONEDRIVE[OneDrive]
+    CONNECTORS -.future.-> GH[GitHub]
+    CONNECTORS -.future.-> JIRA[Jira]
+    CONNECTORS -.future.-> SLACK[Slack]
+    CONNECTORS -.future.-> TEAMS[Microsoft Teams]
+    CONNECTORS -.future.-> EMAIL[Email]
+    CONNECTORS -.future.-> RESTSRC[REST API Sources]
+    CONNECTORS -.future.-> GQLSRC[GraphQL API Sources]
+    CONNECTORS -.future.-> SQLSRC[SQL Databases]
 
-    API -.provider abstraction.-> OPENAI
-    API -.provider abstraction.-> ANTH
-    API -.provider abstraction.-> AZURE
-    API -.provider abstraction.-> PRIVATE
+    LLM --> OLLAMA[Ollama - MVP]
+    LLM -.future.-> OPENAI[OpenAI]
+    LLM -.future.-> ANTH[Anthropic]
+    LLM -.future.-> AZURE[Azure OpenAI]
+    LLM -.future.-> PRIVATE[Private LLM Server]
+
+    API --> LOG[(AI Request Log / Audit Store)]
 ```
 
 ---
 
 ## Deployment Evolution Context
 
-### V1 (current target)
-- Single local deployment on developer machine
-- Local Ollama + local Postgres/pgvector
-- PDF upload as first source type
+### MVP: Single Local Deployment
+- single runtime on developer machine
+- Postgres + pgvector + Ollama locally
+- PDF connector, knowledge engine, chat, tool framework, web search tool
 
-### Shared SaaS (future)
-- Shared multi-tenant web/api runtime
-- Managed database and storage
-- Hosted AI providers and/or managed inference
+### Future: Shared SaaS
+- shared multi-tenant control plane and execution runtime
+- managed storage, AI provider routing, and operations
 
-### Enterprise dedicated (future)
-- Per-customer isolated deployment:
-  - dedicated backend
-  - dedicated database/vector store
-  - dedicated model runtime/provider connection
-
-The same domain model and module boundaries are preserved across stages to avoid rewrites.
+### Enterprise: Dedicated Deployment per Company
+- dedicated backend runtime
+- dedicated database/vector infrastructure
+- dedicated connector credentials and policy boundaries
+- optional dedicated/private model connectivity
