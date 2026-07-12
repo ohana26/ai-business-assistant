@@ -8,15 +8,16 @@ import { AuditModule } from '../audit/audit.module';
 import { AccessTokenStrategy } from './strategies/access-token.strategy';
 import { RefreshTokenStrategy } from './strategies/refresh-token.strategy';
 import { CurrentUserContextGuard } from './guards/current-user-context.guard';
-import { PermissionGuard } from './guards/permission.guard';
 import { RoleGuard } from './guards/role.guard';
 import { AttributeGuard } from './guards/attribute.guard';
 import { AbacEvaluatorService } from './services/abac-evaluator.service';
+import { PermissionsModule } from '../permissions/permissions.module';
 
 @Module({
   imports: [
     DatabaseModule,
     AuditModule,
+    PermissionsModule,
     PassportModule,
     JwtModule.register({}),
   ],
@@ -26,7 +27,6 @@ import { AbacEvaluatorService } from './services/abac-evaluator.service';
     AccessTokenStrategy,
     RefreshTokenStrategy,
     CurrentUserContextGuard,
-    PermissionGuard,
     RoleGuard,
     AttributeGuard,
     AbacEvaluatorService,
@@ -34,10 +34,10 @@ import { AbacEvaluatorService } from './services/abac-evaluator.service';
   exports: [
     AuthService,
     CurrentUserContextGuard,
-    PermissionGuard,
     RoleGuard,
     AttributeGuard,
     AbacEvaluatorService,
+    PermissionsModule,
   ],
 })
 export class AuthModule {}

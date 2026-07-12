@@ -2,13 +2,13 @@ import { Controller, Get, Post, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { CurrentUserContext } from '../auth/decorators/current-user-context.decorator';
 import { RequireAttributes } from '../auth/decorators/require-attributes.decorator';
-import { RequirePermission } from '../auth/decorators/require-permission.decorator';
 import { AttributeGuard } from '../auth/guards/attribute.guard';
 import { RBAC_PERMISSIONS } from '../auth/constants/rbac.constants';
 import { CurrentUserContextGuard } from '../auth/guards/current-user-context.guard';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { PermissionGuard } from '../auth/guards/permission.guard';
 import type { CurrentUserContext as CurrentUserContextType } from '../auth/types/current-user-context.type';
+import { RequirePermission } from '../permissions/decorators/require-permission.decorator';
+import { PermissionsGuard } from '../permissions/permissions.guard';
 
 @ApiTags('Knowledge')
 @ApiBearerAuth('access-token')
@@ -19,7 +19,7 @@ export class KnowledgeController {
     description: 'Requires permission: knowledge.view',
   })
   @Get()
-  @UseGuards(JwtAuthGuard, CurrentUserContextGuard, PermissionGuard)
+  @UseGuards(JwtAuthGuard, CurrentUserContextGuard, PermissionsGuard)
   @RequirePermission(RBAC_PERMISSIONS.KNOWLEDGE_VIEW)
   getKnowledge(@CurrentUserContext() userContext: CurrentUserContextType) {
     return {
@@ -37,7 +37,7 @@ export class KnowledgeController {
   @UseGuards(
     JwtAuthGuard,
     CurrentUserContextGuard,
-    PermissionGuard,
+    PermissionsGuard,
     AttributeGuard,
   )
   @RequirePermission(RBAC_PERMISSIONS.KNOWLEDGE_UPLOAD)

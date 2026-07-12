@@ -18,12 +18,12 @@ import {
 } from '@nestjs/swagger';
 import type { Request } from 'express';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
-import { RequirePermission } from '../auth/decorators/require-permission.decorator';
 import { RBAC_PERMISSIONS } from '../auth/constants/rbac.constants';
 import { CurrentUserContextGuard } from '../auth/guards/current-user-context.guard';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { PermissionGuard } from '../auth/guards/permission.guard';
 import type { JwtUser } from '../auth/types/jwt-user.type';
+import { RequirePermission } from '../permissions/decorators/require-permission.decorator';
+import { PermissionsGuard } from '../permissions/permissions.guard';
 import { AssignMembershipRoleDto } from './dto/assign-membership-role.dto';
 import { AssignRolePermissionsDto } from './dto/assign-role-permissions.dto';
 import { CreateRoleDto } from './dto/create-role.dto';
@@ -37,7 +37,7 @@ import { RolesService } from './roles.service';
   required: true,
   description: 'Company scope for RBAC operations',
 })
-@UseGuards(JwtAuthGuard, CurrentUserContextGuard, PermissionGuard)
+@UseGuards(JwtAuthGuard, CurrentUserContextGuard, PermissionsGuard)
 @RequirePermission(RBAC_PERMISSIONS.COMPANY_MANAGE)
 @Controller()
 export class RolesController {
