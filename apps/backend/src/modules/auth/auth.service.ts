@@ -13,6 +13,7 @@ import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 import type { JwtUser } from './types/jwt-user.type';
 import type { AuthTokens, AuthResponse } from './types/auth-response.type';
+import { AuditService } from '../audit/audit.service';
 
 @Injectable()
 export class AuthService {
@@ -23,6 +24,7 @@ export class AuthService {
     private readonly prisma: PrismaService,
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
+    private readonly auditService: AuditService,
   ) {}
 
   async register(registerDto: RegisterDto): Promise<AuthResponse> {
@@ -49,6 +51,11 @@ export class AuthService {
       },
     });
 
+    await this.auditService.logUserCreation(user.id, user.id, {
+      email: user.email,
+      source: 'auth.register',
+    });
+
     return this.issueTokensForUser(user, true);
   }
 
@@ -72,6 +79,11 @@ export class AuthService {
     await this.prisma.user.update({
       where: { id: user.id },
       data: { lastLoginAt: new Date() },
+    });
+
+    await this.auditService.logLogin(user.id, {
+      email: user.email,
+      source: 'auth.login',
     });
 
     return this.issueTokensForUser(user, false);
@@ -130,6 +142,10 @@ export class AuthService {
       data: {
         revokedAt: new Date(),
       },
+    });
+
+    await this.auditService.logLogout(userId, {
+      source: 'auth.logout',
     });
   }
 

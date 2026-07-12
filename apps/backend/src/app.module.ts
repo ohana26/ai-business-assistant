@@ -13,6 +13,7 @@ import { ToolsModule } from './modules/tools/tools.module';
 import { AiProvidersModule } from './modules/ai-providers/ai-providers.module';
 import { HealthModule } from './health/health.module';
 import { DatabaseModule } from './database/database.module';
+import { AuditModule } from './modules/audit/audit.module';
 
 @Module({
   imports: [
@@ -23,6 +24,7 @@ import { DatabaseModule } from './database/database.module';
       envFilePath: ['.env'],
     }),
     DatabaseModule,
+    AuditModule,
     HealthModule,
     AuthModule,
     UsersModule,
