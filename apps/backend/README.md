@@ -79,6 +79,16 @@ Example response:
 }
 ```
 
+## Swagger API Docs
+
+Interactive API documentation is available at:
+
+```text
+http://localhost:3000/docs
+```
+
+After starting the backend, open `/docs` in your browser to inspect and test endpoints.
+
 ## Prisma Commands
 
 ```bash
