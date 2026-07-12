@@ -1,6 +1,8 @@
 import { Controller, Get, Post, UseGuards } from '@nestjs/common';
 import { CurrentUserContext } from '../auth/decorators/current-user-context.decorator';
+import { RequireAttributes } from '../auth/decorators/require-attributes.decorator';
 import { RequirePermission } from '../auth/decorators/require-permission.decorator';
+import { AttributeGuard } from '../auth/guards/attribute.guard';
 import { RBAC_PERMISSIONS } from '../auth/constants/rbac.constants';
 import { CurrentUserContextGuard } from '../auth/guards/current-user-context.guard';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -20,8 +22,14 @@ export class KnowledgeController {
   }
 
   @Post('upload')
-  @UseGuards(JwtAuthGuard, CurrentUserContextGuard, PermissionGuard)
+  @UseGuards(
+    JwtAuthGuard,
+    CurrentUserContextGuard,
+    PermissionGuard,
+    AttributeGuard,
+  )
   @RequirePermission(RBAC_PERMISSIONS.KNOWLEDGE_UPLOAD)
+  @RequireAttributes({ key: 'securityLevel', value: 'CONFIDENTIAL' })
   uploadKnowledge(@CurrentUserContext() userContext: CurrentUserContextType) {
     return {
       message: 'Knowledge upload endpoint placeholder',
