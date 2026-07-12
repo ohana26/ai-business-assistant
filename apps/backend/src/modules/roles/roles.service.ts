@@ -197,15 +197,17 @@ export class RolesService {
       );
     }
 
-    await this.prisma.rolePermission.deleteMany({
-      where: { roleId: role.id },
-    });
-    await this.prisma.rolePermission.createMany({
-      data: permissions.map((permission) => ({
-        roleId: role.id,
-        permissionId: permission.id,
-      })),
-      skipDuplicates: true,
+    await this.prisma.$transaction(async (tx) => {
+      await tx.rolePermission.deleteMany({
+        where: { roleId: role.id },
+      });
+      await tx.rolePermission.createMany({
+        data: permissions.map((permission) => ({
+          roleId: role.id,
+          permissionId: permission.id,
+        })),
+        skipDuplicates: true,
+      });
     });
 
     await this.auditService.log({
