@@ -5,6 +5,7 @@ import {
   IsNumberString,
   IsOptional,
   IsString,
+  Matches,
   IsUrl,
   validateSync,
 } from 'class-validator';
@@ -30,6 +31,22 @@ class EnvironmentVariables {
   @IsOptional()
   @IsString()
   NODE_ENV?: string;
+
+  @IsString()
+  @IsNotEmpty()
+  JWT_ACCESS_SECRET!: string;
+
+  @IsString()
+  @IsNotEmpty()
+  JWT_REFRESH_SECRET!: string;
+
+  @IsString()
+  @Matches(/^\d+[smhd]$/i)
+  JWT_ACCESS_EXPIRES_IN!: string;
+
+  @IsString()
+  @Matches(/^\d+[smhd]$/i)
+  JWT_REFRESH_EXPIRES_IN!: string;
 }
 
 export function validateEnvironment(
