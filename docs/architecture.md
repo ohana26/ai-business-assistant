@@ -321,29 +321,194 @@ ai-business-assistant/
 
 ---
 
-## 12) Deployment Evolution Strategy
+## 12) Deployment Strategy (Target Topologies)
 
-### MVP: single local deployment
-- one docker-compose environment
-- local Postgres + pgvector + Ollama
-- PDF connector + knowledge engine + basic tools
+The platform is designed to support multiple deployment topologies with the same core application architecture and module contracts.
 
-### Future: shared SaaS
-- shared multi-tenant control plane and runtime
-- managed storage/database/services
-- stronger operational governance and scaling
+### A) Multi-Tenant SaaS Deployment
+Use case:
+- default commercial SaaS product for many companies.
 
-### Enterprise: dedicated deployment per company
-- isolated backend runtime
-- isolated database/vector resources
-- isolated connector credentials and policy boundary
-- dedicated or private AI runtime/provider connectivity
+Characteristics:
+- shared control plane and shared application runtime across tenants,
+- strict tenant isolation via `companyId` and `workspaceId` boundaries in every read/write path,
+- centralized operations for upgrades, observability, and cost optimization.
 
-Architecture goal: evolve across these stages without major rewrites.
+Isolation model:
+- logical data isolation in shared services,
+- optional tenant-specific encryption keys for sensitive enterprise tiers.
+
+### B) Single-Tenant AWS Deployment (Dedicated Customer Stack)
+Use case:
+- enterprise customers requiring stronger isolation without full on-prem operations.
+
+Characteristics:
+- one AWS environment per customer (dedicated VPC/network boundary),
+- dedicated application runtime, dedicated database/vector capacity,
+- customer-specific integrations, IAM boundaries, and outbound policy controls.
+
+Isolation model:
+- infrastructure-level isolation per customer account/project/environment,
+- optional dedicated AI provider endpoints and model gateways.
+
+### C) Private Cloud Deployment
+Use case:
+- customers operating in managed private cloud or regulated hosted environments.
+
+Characteristics:
+- same runtime components, deployed into customer private cloud/Kubernetes,
+- private networking, private peering, and customer-controlled egress policies,
+- compatible with customer SIEM, identity, and secret management systems.
+
+Isolation model:
+- tenant can be single-company or customer-defined segmentation in private environment.
+
+### D) On-Premise Deployment (Future)
+Use case:
+- strict data residency / air-gapped / high-compliance installations.
+
+Characteristics:
+- deployable with minimal external dependencies,
+- local model/runtime support (for example Ollama or private inference servers),
+- offline-capable operations and upgrade bundles.
+
+Isolation model:
+- physical and network isolation managed by customer infrastructure.
+
+Architecture requirement:
+- each deployment model must reuse the same core modules (auth, workspaces, knowledge, tools, agent, observability) and the same API contracts to avoid code forks.
 
 ---
 
-## 13) MVP Scope Guardrails
+## 13) Docker and Runtime Packaging Strategy
+
+Container strategy:
+- package backend and frontend as separate OCI images,
+- support profile-based local orchestration with `docker-compose` for development,
+- use the same image artifacts across environments (dev/stage/prod) with configuration-only differences.
+
+Image design principles:
+- minimal base images and non-root runtime user,
+- deterministic builds and pinned build tooling,
+- health checks for API, worker, database dependencies, and model endpoints.
+
+Deployment mapping:
+- local: docker-compose (Postgres + Ollama + apps),
+- cloud/private: Kubernetes or container service using same images,
+- on-prem future: compose or K8s manifests from same image set.
+
+---
+
+## 14) Environment Configuration Strategy
+
+Configuration layers:
+1. **Static defaults** in code for safe non-secret behavior.
+2. **Environment variables** for deployment-specific values.
+3. **Secret references** for credentials/tokens/keys.
+4. **Tenant-level runtime config** (provider/model/tool policy) in database.
+
+Rules:
+- never hardcode secrets in source control,
+- validate required environment variables at startup,
+- keep provider endpoints, model names, and feature toggles environment-driven,
+- use explicit per-environment config (`local`, `staging`, `production`, `enterprise-dedicated`).
+
+---
+
+## 15) Infrastructure as Code (IaC) Plan
+
+Principle:
+- every non-local environment is reproducible via IaC.
+
+Proposed approach:
+- Terraform/OpenTofu for cloud primitives (networking, compute, DB, object storage, IAM, KMS, DNS),
+- Helm/Kustomize for Kubernetes runtime deployment,
+- modular stacks:
+  - `core-platform` (shared services),
+  - `tenant-dedicated` (single-tenant AWS/private cloud),
+  - `observability`,
+  - `security-baseline`.
+
+State and promotion:
+- isolated state per environment/workspace,
+- pull-request-driven infra changes with policy checks,
+- promotion pipeline from lower to higher environments with drift detection.
+
+---
+
+## 16) Secrets Management Strategy
+
+Requirements:
+- centralized secret store per environment,
+- strict least-privilege access from workloads,
+- audit trail for secret reads/rotations.
+
+Operational pattern:
+- inject secrets at runtime from secret manager (not from git),
+- rotate database credentials, JWT signing keys, connector credentials, and provider keys,
+- support customer-managed keys for enterprise tiers.
+
+Compatibility targets:
+- SaaS and single-tenant AWS: AWS Secrets Manager / Parameter Store + KMS,
+- private cloud: Vault or cloud-equivalent secret services,
+- on-prem future: Vault/offline secret distribution model.
+
+---
+
+## 17) Storage Abstraction Strategy
+
+Storage domains:
+- relational metadata (PostgreSQL),
+- vector embeddings/indexes (pgvector initially, pluggable vector backend later),
+- blob/object storage for uploaded and processed source artifacts.
+
+Abstraction rule:
+- application code depends on interfaces (`BlobStorage`, `VectorIndex`, `DocumentStore`) rather than vendor SDKs directly.
+
+Backends by deployment:
+- SaaS: managed Postgres + managed object storage,
+- single-tenant AWS: dedicated RDS/Aurora + S3,
+- private cloud: customer-managed Postgres + S3-compatible storage,
+- on-prem future: local object store/S3-compatible gateway + local DB cluster.
+
+---
+
+## 18) AI Provider Abstraction Strategy (Deployment-Aware)
+
+Provider abstraction remains mandatory across all topologies.
+
+Runtime requirements:
+- select provider per tenant/workspace policy,
+- support fallback routing (for example local provider first, remote provider fallback where allowed),
+- capture provider/model details in audit and observability records.
+
+Deployment implications:
+- SaaS: mix of commercial providers and optional private endpoints,
+- single-tenant/private cloud: customer-selected provider endpoints and networking controls,
+- on-prem future: local inference runtime as primary provider.
+
+---
+
+## 19) Database Migration Strategy
+
+Goals:
+- zero/low-downtime migration flow for production environments,
+- deterministic schema history across shared and dedicated deployments.
+
+Policy:
+- use forward-only versioned migrations,
+- separate migration execution from application startup in production,
+- run pre-deploy compatibility checks and post-deploy validation,
+- include rollback/mitigation playbooks for destructive changes.
+
+Operational model:
+- SaaS: migration pipeline with guarded rollout and monitoring,
+- single-tenant/private cloud: migration job per environment with approval gates,
+- on-prem future: signed migration bundles and documented operator runbooks.
+
+---
+
+## 20) MVP Scope Guardrails
 
 MVP implements:
 - Authentication
