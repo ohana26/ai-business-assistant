@@ -7,10 +7,14 @@ import {
 import { Reflector } from '@nestjs/core';
 import { ROLES_KEY } from '../constants/rbac.constants';
 import type { CurrentUserContext } from '../types/current-user-context.type';
+import { PermissionsService } from '../../permissions/permissions.service';
 
 @Injectable()
 export class RoleGuard implements CanActivate {
-  constructor(private readonly reflector: Reflector) {}
+  constructor(
+    private readonly reflector: Reflector,
+    private readonly permissionsService: PermissionsService,
+  ) {}
 
   canActivate(context: ExecutionContext): boolean {
     const requiredRoles = this.reflector.getAllAndOverride<string[]>(
@@ -31,32 +35,20 @@ export class RoleGuard implements CanActivate {
       throw new ForbiddenException('Missing user context');
     }
 
-    const companyIdHeader = this.getCompanyIdHeader(
-      context.switchToHttp().getRequest<{ headers?: Record<string, string> }>(),
+    const companyAccess = this.permissionsService.resolveCompanyAccess(
+      userContext,
+      context.switchToHttp().getRequest<{
+        headers?: Record<string, string | string[] | undefined>;
+      }>().headers,
     );
-    const effectiveRoles = companyIdHeader
-      ? userContext.companies
-          .filter((company) => company.companyId === companyIdHeader)
-          .map((company) => company.role)
-      : userContext.roles;
 
-    const hasRequiredRole = requiredRoles.some((role) =>
-      effectiveRoles.includes(role),
+    const hasRequiredRole = requiredRoles.some(
+      (role) => companyAccess.role === role,
     );
     if (!hasRequiredRole) {
       throw new ForbiddenException('Missing required role');
     }
 
     return true;
-  }
-
-  private getCompanyIdHeader(request: {
-    headers?: Record<string, string | string[] | undefined>;
-  }): string | undefined {
-    const rawHeader = request.headers?.['x-company-id'];
-    if (Array.isArray(rawHeader)) {
-      return rawHeader[0];
-    }
-    return rawHeader;
   }
 }

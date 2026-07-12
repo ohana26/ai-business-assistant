@@ -31,6 +31,10 @@ export class CurrentUserContextGuard implements CanActivate {
         userId: request.user.userId,
         status: MembershipStatus.ACTIVE,
         deletedAt: null,
+        company: {
+          status: 'ACTIVE',
+          deletedAt: null,
+        },
       },
       include: {
         role: {

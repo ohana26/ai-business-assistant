@@ -7,6 +7,10 @@ export class PermissionsService {
     userContext: CurrentUserContext,
     headers?: Record<string, string | string[] | undefined>,
   ) {
+    if (userContext.companies.length === 0) {
+      throw new ForbiddenException('No active membership in an active company');
+    }
+
     const companyIdHeader = this.getCompanyIdHeader(headers);
     if (companyIdHeader) {
       const scopedAccess = userContext.companies.find(
