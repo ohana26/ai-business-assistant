@@ -97,6 +97,23 @@ npm run prisma:generate
 npm run prisma:migrate:dev
 npm run prisma:migrate:deploy
 npm run prisma:studio
+npm run prisma:seed
+```
+
+## RBAC Seeding
+
+The seed script creates default permissions and system roles:
+
+- `SUPER_ADMIN`
+- `COMPANY_ADMIN`
+- `MANAGER`
+- `USER`
+- `READ_ONLY`
+
+Run:
+
+```bash
+npm run prisma:seed
 ```
 
 ## Run Locally
