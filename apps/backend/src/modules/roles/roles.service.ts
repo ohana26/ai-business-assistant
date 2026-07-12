@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -89,17 +90,19 @@ export class RolesService {
     const role = await this.prisma.role.findFirst({
       where: {
         id: roleId,
-        companyId,
         deletedAt: null,
+        OR: [{ companyId }, { isSystemRole: true, companyId: null }],
       },
       select: {
         id: true,
         name: true,
+        isSystemRole: true,
       },
     });
     if (!role) {
       throw new NotFoundException('Role not found');
     }
+    await this.assertRoleMutable(role, actorUserId, 'update', { companyId });
 
     const nextName = dto.name?.trim().toUpperCase();
     if (nextName && nextName !== role.name) {
@@ -158,11 +161,15 @@ export class RolesService {
       select: {
         id: true,
         name: true,
+        isSystemRole: true,
       },
     });
     if (!role) {
       throw new NotFoundException('Role not found');
     }
+    await this.assertRoleMutable(role, actorUserId, 'permissions.assign', {
+      companyId,
+    });
 
     const permissionKeys = Array.from(
       new Set(dto.permissionKeys.map((key) => key.trim()).filter(Boolean)),
@@ -190,15 +197,17 @@ export class RolesService {
       );
     }
 
-    await this.prisma.rolePermission.deleteMany({
-      where: { roleId: role.id },
-    });
-    await this.prisma.rolePermission.createMany({
-      data: permissions.map((permission) => ({
-        roleId: role.id,
-        permissionId: permission.id,
-      })),
-      skipDuplicates: true,
+    await this.prisma.$transaction(async (tx) => {
+      await tx.rolePermission.deleteMany({
+        where: { roleId: role.id },
+      });
+      await tx.rolePermission.createMany({
+        data: permissions.map((permission) => ({
+          roleId: role.id,
+          permissionId: permission.id,
+        })),
+        skipDuplicates: true,
+      });
     });
 
     await this.auditService.log({
@@ -225,6 +234,32 @@ export class RolesService {
         },
       },
     });
+  }
+
+  private async assertRoleMutable(
+    role: {
+      id: string;
+      name: string;
+      isSystemRole: boolean;
+    },
+    actorUserId: string,
+    operation: 'update' | 'delete' | 'permissions.assign',
+    metadata?: Record<string, string>,
+  ) {
+    if (!role.isSystemRole) {
+      return;
+    }
+
+    await this.auditService.logSystemRoleMutationAttempt(
+      actorUserId,
+      role.id,
+      operation,
+      {
+        roleName: role.name,
+        ...metadata,
+      },
+    );
+    throw new ForbiddenException('SYSTEM_ROLE_IMMUTABLE');
   }
 
   async assignRoleToMembership(
