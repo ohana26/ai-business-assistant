@@ -2,6 +2,7 @@ import {
   BadRequestException,
   ForbiddenException,
   Injectable,
+  InternalServerErrorException,
   NotFoundException,
 } from '@nestjs/common';
 import { MembershipStatus } from '@prisma/client';
@@ -152,25 +153,6 @@ export class RolesService {
     dto: AssignRolePermissionsDto,
     actorUserId: string,
   ) {
-    const role = await this.prisma.role.findFirst({
-      where: {
-        id: roleId,
-        deletedAt: null,
-        OR: [{ companyId }, { isSystemRole: true, companyId: null }],
-      },
-      select: {
-        id: true,
-        name: true,
-        isSystemRole: true,
-      },
-    });
-    if (!role) {
-      throw new NotFoundException('Role not found');
-    }
-    await this.assertRoleMutable(role, actorUserId, 'permissions.assign', {
-      companyId,
-    });
-
     const permissionKeys = Array.from(
       new Set(dto.permissionKeys.map((key) => key.trim()).filter(Boolean)),
     );
@@ -180,35 +162,77 @@ export class RolesService {
       );
     }
 
-    const permissions = await this.prisma.permission.findMany({
-      where: {
-        key: { in: permissionKeys },
-      },
-      select: {
-        id: true,
-        key: true,
-      },
-    });
-    if (permissions.length !== permissionKeys.length) {
-      const found = new Set(permissions.map((permission) => permission.key));
-      const missing = permissionKeys.filter((key) => !found.has(key));
-      throw new BadRequestException(
-        `Unknown permission keys: ${missing.join(', ')}`,
+    let role: { id: string; name: string; isSystemRole: boolean };
+    try {
+      role = await this.prisma.$transaction(async (tx) => {
+        const roleEntity = await tx.role.findFirst({
+          where: {
+            id: roleId,
+            deletedAt: null,
+            OR: [{ companyId }, { isSystemRole: true, companyId: null }],
+          },
+          select: {
+            id: true,
+            name: true,
+            isSystemRole: true,
+          },
+        });
+        if (!roleEntity) {
+          throw new NotFoundException('Role not found');
+        }
+        await this.assertRoleMutable(
+          roleEntity,
+          actorUserId,
+          'permissions.assign',
+          {
+            companyId,
+          },
+        );
+
+        const permissions = await tx.permission.findMany({
+          where: {
+            key: { in: permissionKeys },
+          },
+          select: {
+            id: true,
+            key: true,
+          },
+        });
+        if (permissions.length !== permissionKeys.length) {
+          const found = new Set(
+            permissions.map((permission) => permission.key),
+          );
+          const missing = permissionKeys.filter((key) => !found.has(key));
+          throw new BadRequestException(
+            `Unknown permission keys: ${missing.join(', ')}`,
+          );
+        }
+
+        await tx.rolePermission.deleteMany({
+          where: { roleId: roleEntity.id },
+        });
+        await tx.rolePermission.createMany({
+          data: permissions.map((permission) => ({
+            roleId: roleEntity.id,
+            permissionId: permission.id,
+          })),
+          skipDuplicates: true,
+        });
+
+        return roleEntity;
+      });
+    } catch (error) {
+      if (
+        error instanceof NotFoundException ||
+        error instanceof BadRequestException ||
+        error instanceof ForbiddenException
+      ) {
+        throw error;
+      }
+      throw new InternalServerErrorException(
+        'Failed to replace role permissions',
       );
     }
-
-    await this.prisma.$transaction(async (tx) => {
-      await tx.rolePermission.deleteMany({
-        where: { roleId: role.id },
-      });
-      await tx.rolePermission.createMany({
-        data: permissions.map((permission) => ({
-          roleId: role.id,
-          permissionId: permission.id,
-        })),
-        skipDuplicates: true,
-      });
-    });
 
     await this.auditService.log({
       companyId,
