@@ -6,11 +6,21 @@ import { AuthService } from './auth.service';
 import { DatabaseModule } from '../../database/database.module';
 import { AccessTokenStrategy } from './strategies/access-token.strategy';
 import { RefreshTokenStrategy } from './strategies/refresh-token.strategy';
+import { CurrentUserContextGuard } from './guards/current-user-context.guard';
+import { PermissionGuard } from './guards/permission.guard';
+import { RoleGuard } from './guards/role.guard';
 
 @Module({
   imports: [DatabaseModule, PassportModule, JwtModule.register({})],
   controllers: [AuthController],
-  providers: [AuthService, AccessTokenStrategy, RefreshTokenStrategy],
-  exports: [AuthService],
+  providers: [
+    AuthService,
+    AccessTokenStrategy,
+    RefreshTokenStrategy,
+    CurrentUserContextGuard,
+    PermissionGuard,
+    RoleGuard,
+  ],
+  exports: [AuthService, CurrentUserContextGuard, PermissionGuard, RoleGuard],
 })
 export class AuthModule {}
