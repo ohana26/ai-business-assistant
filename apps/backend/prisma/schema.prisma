@@ -36,6 +36,57 @@ enum SecurityLevel {
   RESTRICTED
 }
 
+enum KnowledgeBaseStatus {
+  ACTIVE
+  ARCHIVED
+}
+
+enum CollectionStatus {
+  ACTIVE
+  ARCHIVED
+}
+
+enum KnowledgeSourceType {
+  FILE_UPLOAD
+  GOOGLE_DRIVE
+  ONEDRIVE
+  EMAIL
+  SLACK
+  DATABASE
+  API
+  WEB
+  MANUAL
+}
+
+enum KnowledgeSourceStatus {
+  ACTIVE
+  PAUSED
+  ERROR
+}
+
+enum KnowledgeAssetStatus {
+  PENDING
+  PROCESSING
+  READY
+  FAILED
+  ARCHIVED
+}
+
+enum AssetContentType {
+  PDF
+  DOCX
+  TXT
+  MARKDOWN
+  HTML
+  CSV
+  JSON
+  EMAIL_MESSAGE
+  SLACK_MESSAGE
+  DB_ROW
+  API_RECORD
+  OTHER
+}
+
 model User {
   id                  String       @id @default(uuid()) @db.Uuid
   email               String       @unique
@@ -114,6 +165,13 @@ model Company {
   roles       Role[]
   workspaces  Workspace[]
   auditLogs   AuditLog[]
+  knowledgeBases      KnowledgeBase[]
+  collections         Collection[]
+  knowledgeSources    KnowledgeSource[]
+  knowledgeAssets     KnowledgeAsset[]
+  documentMetadatas   DocumentMetadata[]
+  chunks              Chunk[]
+  embeddings          Embedding[]
   createdAt   DateTime     @default(now())
   updatedAt   DateTime     @updatedAt
   deletedAt   DateTime?
@@ -195,6 +253,7 @@ model Workspace {
   status               WorkspaceStatus       @default(ACTIVE)
   company              Company               @relation(fields: [companyId], references: [id], onDelete: Restrict)
   workspaceMemberships WorkspaceMembership[]
+  knowledgeBases       KnowledgeBase[]
   createdAt            DateTime              @default(now())
   updatedAt            DateTime              @updatedAt
   deletedAt            DateTime?
@@ -239,7 +298,164 @@ model AuditLog {
   @@index([createdAt])
 }
 
+model KnowledgeBase {
+  id          String              @id @default(uuid()) @db.Uuid
+  companyId   String              @db.Uuid
+  workspaceId String              @db.Uuid
+  name        String
+  slug        String
+  description String?
+  status      KnowledgeBaseStatus @default(ACTIVE)
+  company     Company             @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  workspace   Workspace           @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
+  collections Collection[]
+  sources     KnowledgeSource[]
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+  deletedAt   DateTime?
+
+  @@unique([companyId, workspaceId, slug])
+  @@index([companyId, workspaceId, status])
+  @@index([workspaceId, status])
+  @@index([deletedAt])
+}
+
+model Collection {
+  id              String           @id @default(uuid()) @db.Uuid
+  companyId       String           @db.Uuid
+  knowledgeBaseId String           @db.Uuid
+  name            String
+  slug            String
+  description     String?
+  status          CollectionStatus @default(ACTIVE)
+  company         Company          @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  knowledgeBase   KnowledgeBase    @relation(fields: [knowledgeBaseId], references: [id], onDelete: Restrict)
+  assets          KnowledgeAsset[]
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  deletedAt       DateTime?
+
+  @@unique([knowledgeBaseId, slug])
+  @@index([companyId, knowledgeBaseId, status])
+  @@index([deletedAt])
+}
+
+model KnowledgeSource {
+  id                String                @id @default(uuid()) @db.Uuid
+  companyId         String                @db.Uuid
+  knowledgeBaseId   String                @db.Uuid
+  name              String
+  sourceType        KnowledgeSourceType
+  status            KnowledgeSourceStatus @default(ACTIVE)
+  connectorConfig   Json?
+  syncState         Json?
+  externalReference String?
+  lastSyncedAt      DateTime?
+  company           Company               @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  knowledgeBase     KnowledgeBase         @relation(fields: [knowledgeBaseId], references: [id], onDelete: Restrict)
+  assets            KnowledgeAsset[]
+  createdAt         DateTime              @default(now())
+  updatedAt         DateTime              @updatedAt
+  deletedAt         DateTime?
+
+  @@index([companyId, knowledgeBaseId, status])
+  @@index([sourceType, status])
+  @@index([externalReference])
+  @@index([deletedAt])
+}
+
+model KnowledgeAsset {
+  id              String               @id @default(uuid()) @db.Uuid
+  companyId       String               @db.Uuid
+  collectionId    String               @db.Uuid
+  sourceId        String?              @db.Uuid
+  title           String
+  contentType     AssetContentType
+  status          KnowledgeAssetStatus @default(PENDING)
+  mimeType        String?
+  language        String?
+  checksum        String?
+  storagePath     String?
+  sizeBytes       BigInt?
+  sourceUpdatedAt DateTime?
+  company         Company              @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  collection      Collection           @relation(fields: [collectionId], references: [id], onDelete: Restrict)
+  source          KnowledgeSource?     @relation(fields: [sourceId], references: [id], onDelete: SetNull)
+  metadata        DocumentMetadata?
+  chunks          Chunk[]
+  createdAt       DateTime             @default(now())
+  updatedAt       DateTime             @updatedAt
+  deletedAt       DateTime?
+
+  @@index([companyId, collectionId, status])
+  @@index([sourceId, status])
+  @@index([checksum])
+  @@index([deletedAt])
+}
+
+model DocumentMetadata {
+  id               String          @id @default(uuid()) @db.Uuid
+  companyId        String          @db.Uuid
+  knowledgeAssetId String          @unique @db.Uuid
+  author           String?
+  sourceCreatedAt  DateTime?
+  sourceUpdatedAt  DateTime?
+  pageCount        Int?
+  metadata         Json?
+  company          Company         @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  knowledgeAsset   KnowledgeAsset  @relation(fields: [knowledgeAssetId], references: [id], onDelete: Cascade)
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+  deletedAt        DateTime?
+
+  @@index([companyId])
+  @@index([deletedAt])
+}
+
+model Chunk {
+  id               String          @id @default(uuid()) @db.Uuid
+  companyId        String          @db.Uuid
+  knowledgeAssetId String          @db.Uuid
+  chunkIndex       Int
+  content          String
+  tokenCount       Int?
+  startOffset      Int?
+  endOffset        Int?
+  metadata         Json?
+  company          Company         @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  knowledgeAsset   KnowledgeAsset  @relation(fields: [knowledgeAssetId], references: [id], onDelete: Cascade)
+  embeddings       Embedding[]
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+  deletedAt        DateTime?
+
+  @@unique([knowledgeAssetId, chunkIndex])
+  @@index([companyId, knowledgeAssetId])
+  @@index([knowledgeAssetId, deletedAt])
+  @@index([deletedAt])
+}
+
+model Embedding {
+  id            String   @id @default(uuid()) @db.Uuid
+  companyId     String   @db.Uuid
+  chunkId       String   @db.Uuid
+  provider      String
+  model         String
+  dimensions    Int
+  vectorVersion Int      @default(1)
+  values        Json?
+  company       Company  @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  chunk         Chunk    @relation(fields: [chunkId], references: [id], onDelete: Cascade)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  deletedAt     DateTime?
+
+  @@unique([chunkId, provider, model, vectorVersion])
+  @@index([companyId, provider, model])
+  @@index([chunkId])
+  @@index([deletedAt])
+}
+
 /// Approved additions (future phases, intentionally not implemented now):
 /// - KnowledgeSyncJob
-/// - AuditLog
 /// - Integration entity between external connections and tools
