@@ -109,4 +109,22 @@ export class AuditService {
       metadata,
     });
   }
+
+  async logSystemRoleMutationAttempt(
+    actorUserId: string,
+    roleId: string,
+    operation: 'update' | 'delete' | 'permissions.assign',
+    metadata?: Prisma.InputJsonValue,
+  ) {
+    return this.log({
+      userId: actorUserId,
+      action: 'role.system_mutation_attempt',
+      resourceType: 'role',
+      resourceId: roleId,
+      metadata: {
+        operation,
+        ...(metadata && typeof metadata === 'object' ? metadata : {}),
+      },
+    });
+  }
 }
