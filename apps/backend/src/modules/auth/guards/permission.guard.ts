@@ -31,14 +31,13 @@ export class PermissionGuard implements CanActivate {
       throw new ForbiddenException('Missing user context');
     }
 
-    const companyIdHeader = this.getCompanyIdHeader(
-      context.switchToHttp().getRequest<{ headers?: Record<string, string> }>(),
+    const companyAccess = this.resolveCompanyAccess(
+      userContext,
+      context.switchToHttp().getRequest<{
+        headers?: Record<string, string | string[] | undefined>;
+      }>(),
     );
-    const effectivePermissions = companyIdHeader
-      ? userContext.companies
-          .filter((company) => company.companyId === companyIdHeader)
-          .flatMap((company) => company.permissions)
-      : userContext.permissions;
+    const effectivePermissions = companyAccess.permissions;
 
     const hasAllPermissions = requiredPermissions.every((permission) =>
       effectivePermissions.includes(permission),
@@ -49,6 +48,34 @@ export class PermissionGuard implements CanActivate {
     }
 
     return true;
+  }
+
+  private resolveCompanyAccess(
+    userContext: CurrentUserContext,
+    request: {
+      headers?: Record<string, string | string[] | undefined>;
+    },
+  ) {
+    const companyIdHeader = this.getCompanyIdHeader(request);
+    if (companyIdHeader) {
+      const scopedAccess = userContext.companies.find(
+        (company) => company.companyId === companyIdHeader,
+      );
+      if (!scopedAccess) {
+        throw new ForbiddenException(
+          'No active membership for provided company',
+        );
+      }
+      return scopedAccess;
+    }
+
+    if (userContext.companies.length === 1) {
+      return userContext.companies[0];
+    }
+
+    throw new ForbiddenException(
+      'x-company-id header is required for multi-company users',
+    );
   }
 
   private getCompanyIdHeader(request: {

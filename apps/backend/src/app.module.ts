@@ -14,6 +14,7 @@ import { AiProvidersModule } from './modules/ai-providers/ai-providers.module';
 import { HealthModule } from './health/health.module';
 import { DatabaseModule } from './database/database.module';
 import { AuditModule } from './modules/audit/audit.module';
+import { RolesModule } from './modules/roles/roles.module';
 
 @Module({
   imports: [
@@ -28,6 +29,7 @@ import { AuditModule } from './modules/audit/audit.module';
     HealthModule,
     AuthModule,
     UsersModule,
+    RolesModule,
     CompaniesModule,
     WorkspacesModule,
     KnowledgeModule,
