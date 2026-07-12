@@ -16,15 +16,27 @@ infrastructure/        # Docker, local infra, deployment assets
 
 ## Current Status
 
-This repository currently contains the Phase 1 monorepo scaffold and architecture documents.
+Phase 1 foundations are in place:
+- frontend scaffold (`apps/frontend`)
+- backend scaffold (`apps/backend`)
+- local infrastructure compose setup (`infrastructure/docker-compose.yml`)
 
-Application scaffolding (frontend/backend), database services, and Prisma setup are intentionally implemented in subsequent incremental steps.
+## Quick Start
 
-## Getting Started (Current)
+Install dependencies:
 
-No runnable apps are created yet in this step.
+```bash
+npm install
+```
 
-Next step will initialize:
-- `apps/frontend` with React + Vite + TypeScript
-- `apps/backend` with NestJS + TypeScript
-- `infrastructure/docker-compose.yml` for PostgreSQL (pgvector) and Ollama
+Start infrastructure + backend + frontend from root:
+
+```bash
+npm start
+```
+
+Stop infrastructure services:
+
+```bash
+npm run stop
+```
