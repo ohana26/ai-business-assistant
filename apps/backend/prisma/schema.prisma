@@ -65,6 +65,7 @@ enum KnowledgeSourceStatus {
 }
 
 enum KnowledgeAssetStatus {
+  UPLOADED
   PENDING
   PROCESSING
   READY
@@ -369,6 +370,7 @@ model KnowledgeAsset {
   companyId       String               @db.Uuid
   collectionId    String               @db.Uuid
   sourceId        String?              @db.Uuid
+  filename        String
   title           String
   contentType     AssetContentType
   status          KnowledgeAssetStatus @default(PENDING)
