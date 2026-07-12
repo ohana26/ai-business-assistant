@@ -155,9 +155,28 @@ MVP is complete when a company can:
 2. Additional tools (REST, GraphQL, database, CRM/ERP, email/calendar, MCP tools)
 3. Advanced agent workflows and action execution
 4. Shared SaaS operational hardening
-5. Enterprise dedicated deployment support
+5. Enterprise dedicated deployment support (single-tenant AWS)
 6. SSO, advanced permissions, compliance features
 7. Billing and monetization layers
+
+---
+
+## Deployment Strategy Workstream (Documentation-First, Then Implementation)
+
+This cross-cutting workstream is required before broad feature expansion beyond MVP:
+
+1. Finalize multi-topology deployment model:
+   - multi-tenant SaaS,
+   - single-tenant AWS,
+   - private cloud,
+   - on-premise future packaging.
+2. Standardize Docker image and runtime contract for all topologies.
+3. Formalize environment configuration contract (non-secret config vs secret references).
+4. Deliver Infrastructure as Code baseline modules and promotion process.
+5. Implement secrets lifecycle operations (issuance, rotation, revocation, audit).
+6. Finalize storage abstraction contracts across metadata/vector/blob domains.
+7. Validate AI provider abstraction with deployment-aware routing policies.
+8. Establish production migration process for shared and dedicated environments.
 
 ---
 

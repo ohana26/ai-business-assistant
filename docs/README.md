@@ -12,3 +12,6 @@ Architecture and planning documents:
 - `agent-architecture.md`
 - `connector-architecture.md`
 - `tool-framework.md`
+- Deployment strategy sections are documented in:
+  - `architecture.md` (deployment, IaC, config, secrets, storage, provider, migrations)
+  - `development-roadmap.md` (deployment workstream sequencing)

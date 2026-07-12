@@ -48,6 +48,7 @@ model User {
   refreshTokens       RefreshToken[]
   profile             UserProfile?
   attributes          UserAttribute[]
+  auditLogs           AuditLog[]
   createdAt           DateTime     @default(now())
   updatedAt           DateTime     @updatedAt
   deletedAt           DateTime?
@@ -112,6 +113,7 @@ model Company {
   memberships Membership[]
   roles       Role[]
   workspaces  Workspace[]
+  auditLogs   AuditLog[]
   createdAt   DateTime     @default(now())
   updatedAt   DateTime     @updatedAt
   deletedAt   DateTime?
@@ -217,6 +219,24 @@ model WorkspaceMembership {
   @@index([workspaceId, workspaceRole])
   @@index([membershipId])
   @@index([deletedAt])
+}
+
+model AuditLog {
+  id           String   @id @default(uuid()) @db.Uuid
+  companyId    String?  @db.Uuid
+  userId       String?  @db.Uuid
+  action       String
+  resourceType String
+  resourceId   String?
+  metadata     Json?
+  createdAt    DateTime @default(now())
+  company      Company? @relation(fields: [companyId], references: [id], onDelete: SetNull)
+  user         User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([companyId, action, createdAt])
+  @@index([userId, action, createdAt])
+  @@index([resourceType, resourceId, createdAt])
+  @@index([createdAt])
 }
 
 /// Approved additions (future phases, intentionally not implemented now):

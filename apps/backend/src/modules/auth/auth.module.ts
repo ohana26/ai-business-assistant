@@ -4,6 +4,7 @@ import { PassportModule } from '@nestjs/passport';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 import { DatabaseModule } from '../../database/database.module';
+import { AuditModule } from '../audit/audit.module';
 import { AccessTokenStrategy } from './strategies/access-token.strategy';
 import { RefreshTokenStrategy } from './strategies/refresh-token.strategy';
 import { CurrentUserContextGuard } from './guards/current-user-context.guard';
@@ -13,7 +14,12 @@ import { AttributeGuard } from './guards/attribute.guard';
 import { AbacEvaluatorService } from './services/abac-evaluator.service';
 
 @Module({
-  imports: [DatabaseModule, PassportModule, JwtModule.register({})],
+  imports: [
+    DatabaseModule,
+    AuditModule,
+    PassportModule,
+    JwtModule.register({}),
+  ],
   controllers: [AuthController],
   providers: [
     AuthService,
