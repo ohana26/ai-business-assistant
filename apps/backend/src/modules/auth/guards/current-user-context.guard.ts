@@ -45,6 +45,47 @@ export class CurrentUserContextGuard implements CanActivate {
       },
     });
 
+    const userProfile = await this.prisma.userProfile.findFirst({
+      where: {
+        userId: request.user.userId,
+        deletedAt: null,
+      },
+      select: {
+        department: true,
+        jobTitle: true,
+        location: true,
+        securityLevel: true,
+      },
+    });
+
+    const userAttributes = await this.prisma.userAttribute.findMany({
+      where: {
+        userId: request.user.userId,
+        deletedAt: null,
+      },
+      select: {
+        key: true,
+        value: true,
+      },
+    });
+
+    const attributes: Record<string, string> = {};
+    for (const attribute of userAttributes) {
+      attributes[attribute.key] = attribute.value;
+    }
+    if (userProfile?.department) {
+      attributes.department = userProfile.department;
+    }
+    if (userProfile?.jobTitle) {
+      attributes.jobTitle = userProfile.jobTitle;
+    }
+    if (userProfile?.location) {
+      attributes.location = userProfile.location;
+    }
+    if (userProfile?.securityLevel) {
+      attributes.securityLevel = userProfile.securityLevel;
+    }
+
     const companies: CompanyAccess[] = memberships.map((membership) => ({
       companyId: membership.companyId,
       membershipId: membership.id,
@@ -66,6 +107,13 @@ export class CurrentUserContextGuard implements CanActivate {
     request.currentUserContext = {
       userId: request.user.userId,
       email: request.user.email,
+      profile: {
+        department: userProfile?.department ?? null,
+        jobTitle: userProfile?.jobTitle ?? null,
+        location: userProfile?.location ?? null,
+        securityLevel: userProfile?.securityLevel ?? null,
+      },
+      attributes,
       companies,
       roles: Array.from(roleSet),
       permissions: Array.from(permissionSet),

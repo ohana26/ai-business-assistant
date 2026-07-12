@@ -8,6 +8,13 @@ export type CompanyAccess = {
 export type CurrentUserContext = {
   userId: string;
   email: string;
+  profile: {
+    department: string | null;
+    jobTitle: string | null;
+    location: string | null;
+    securityLevel: string | null;
+  };
+  attributes: Record<string, string>;
   companies: CompanyAccess[];
   roles: string[];
   permissions: string[];
