@@ -26,10 +26,8 @@ type ChatRecord = {
 };
 
 export function ChatPage() {
-  const { companyId, workspaceId } = useWorkspaceStore((state) => ({
-    companyId: state.companyId,
-    workspaceId: state.workspaceId,
-  }));
+  const companyId = useWorkspaceStore((state) => state.companyId);
+  const workspaceId = useWorkspaceStore((state) => state.workspaceId);
   const [message, setMessage] = useState("");
   const [records, setRecords] = useState<ChatRecord[]>([]);
   const [conversationId, setConversationId] = useState<string | undefined>(

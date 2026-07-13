@@ -6,14 +6,10 @@ import { useAuthStore } from "../store/authStore";
 
 export function DashboardPage() {
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
-  const { companyId, workspaceId, collectionId, setContext } = useWorkspaceStore(
-    (state) => ({
-      companyId: state.companyId,
-      workspaceId: state.workspaceId,
-      collectionId: state.collectionId,
-      setContext: state.setContext,
-    }),
-  );
+  const companyId = useWorkspaceStore((state) => state.companyId);
+  const workspaceId = useWorkspaceStore((state) => state.workspaceId);
+  const collectionId = useWorkspaceStore((state) => state.collectionId);
+  const setContext = useWorkspaceStore((state) => state.setContext);
   const [companyInput, setCompanyInput] = useState(companyId);
   const [workspaceInput, setWorkspaceInput] = useState(workspaceId);
   const [collectionInput, setCollectionInput] = useState(collectionId);
