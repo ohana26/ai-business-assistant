@@ -21,6 +21,9 @@ export function LoginPage() {
     mutationFn: login,
     onSuccess: (data) => {
       setAccessToken(data.accessToken);
+      if (data.onboarding) {
+        setContext(data.onboarding);
+      }
       const nextPath =
         typeof location.state === "object" &&
         location.state &&
