@@ -55,6 +55,26 @@ class EnvironmentVariables {
   @IsString()
   @IsNotEmpty()
   STORAGE_PATH!: string;
+
+  @IsOptional()
+  @IsString()
+  OLLAMA_CHAT_MODEL?: string;
+
+  @IsOptional()
+  @IsString()
+  OLLAMA_EMBED_MODEL?: string;
+
+  @IsOptional()
+  @IsNumberString()
+  CHUNK_SIZE?: string;
+
+  @IsOptional()
+  @IsNumberString()
+  CHUNK_OVERLAP?: string;
+
+  @IsOptional()
+  @IsNumberString()
+  RETRIEVAL_TOP_K?: string;
 }
 
 export function validateEnvironment(

@@ -20,6 +20,7 @@ import type { CurrentUserContext } from '../auth/types/current-user-context.type
 import type { StorageProvider } from '../storage/interfaces/storage-provider.interface';
 import { STORAGE_PROVIDER_TOKEN } from '../storage/storage.constants';
 import { UploadKnowledgeAssetDto } from './dto/upload-knowledge-asset.dto';
+import { KnowledgeIngestionService } from './services/knowledge-ingestion.service';
 import type { UploadedKnowledgeFile } from './types/uploaded-knowledge-file.type';
 
 @Injectable()
@@ -27,6 +28,7 @@ export class KnowledgeService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly auditService: AuditService,
+    private readonly knowledgeIngestionService: KnowledgeIngestionService,
     @Inject(STORAGE_PROVIDER_TOKEN)
     private readonly storageProvider: StorageProvider,
   ) {}
@@ -149,8 +151,16 @@ export class KnowledgeService {
 
     await this.storageProvider.upload(file.buffer, storagePath, file.mimetype);
 
+    let createdAsset: {
+      id: string;
+      filename: string;
+      contentType: AssetContentType;
+      status: KnowledgeAssetStatus;
+      sizeBytes: bigint | null;
+      storagePath: string | null;
+    };
     try {
-      const createdAsset = await this.prisma.$transaction(async (tx) => {
+      createdAsset = await this.prisma.$transaction(async (tx) => {
         const asset = await tx.knowledgeAsset.create({
           data: {
             companyId,
@@ -197,21 +207,45 @@ export class KnowledgeService {
           collectionId: dto.collectionId,
         },
       });
-
-      return {
-        id: createdAsset.id,
-        filename: createdAsset.filename,
-        contentType: createdAsset.contentType,
-        status: createdAsset.status,
-        sizeBytes: createdAsset.sizeBytes?.toString() ?? '0',
-        storagePath: createdAsset.storagePath,
-      };
     } catch {
       await this.storageProvider.delete(storagePath).catch(() => undefined);
       throw new InternalServerErrorException(
         'Failed to persist uploaded asset',
       );
     }
+
+    try {
+      await this.knowledgeIngestionService.ingestUploadedAsset(
+        this.storageProvider,
+        createdAsset.id,
+      );
+      createdAsset = await this.prisma.knowledgeAsset.findUniqueOrThrow({
+        where: { id: createdAsset.id },
+        select: {
+          id: true,
+          filename: true,
+          contentType: true,
+          status: true,
+          sizeBytes: true,
+          storagePath: true,
+        },
+      });
+    } catch {
+      await this.prisma.knowledgeAsset.update({
+        where: { id: createdAsset.id },
+        data: { status: KnowledgeAssetStatus.FAILED },
+      });
+      throw new InternalServerErrorException('Failed to ingest uploaded asset');
+    }
+
+    return {
+      id: createdAsset.id,
+      filename: createdAsset.filename,
+      contentType: createdAsset.contentType,
+      status: createdAsset.status,
+      sizeBytes: createdAsset.sizeBytes?.toString() ?? '0',
+      storagePath: createdAsset.storagePath,
+    };
   }
 
   private buildStoragePath(

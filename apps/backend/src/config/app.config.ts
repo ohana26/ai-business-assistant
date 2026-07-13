@@ -12,4 +12,9 @@ export const appConfig = registerAs('app', () => ({
   jwtRefreshExpiresIn: process.env.JWT_REFRESH_EXPIRES_IN ?? '7d',
   storageProvider: process.env.STORAGE_PROVIDER ?? 'local',
   storagePath: process.env.STORAGE_PATH ?? './storage',
+  ollamaChatModel: process.env.OLLAMA_CHAT_MODEL ?? 'llama3.2:3b',
+  ollamaEmbedModel: process.env.OLLAMA_EMBED_MODEL ?? 'nomic-embed-text',
+  chunkSize: Number(process.env.CHUNK_SIZE ?? 1000),
+  chunkOverlap: Number(process.env.CHUNK_OVERLAP ?? 200),
+  retrievalTopK: Number(process.env.RETRIEVAL_TOP_K ?? 5),
 }));
