@@ -3,6 +3,9 @@ import { registerAs } from '@nestjs/config';
 export const appConfig = registerAs('app', () => ({
   port: Number(process.env.PORT ?? 3000),
   environment: process.env.NODE_ENV ?? 'development',
+  corsOrigins:
+    process.env.CORS_ORIGINS ??
+    'http://localhost:5173,http://127.0.0.1:5173',
   aiProvider: process.env.AI_PROVIDER ?? 'ollama',
   ollamaUrl: process.env.OLLAMA_URL ?? 'http://localhost:11434',
   jwtAccessSecret: process.env.JWT_ACCESS_SECRET ?? 'change-me-access-secret',

@@ -18,6 +18,35 @@ async function bootstrap() {
 
   const configService = app.get(ConfigService);
   const port = configService.get<number>('PORT', 3000);
+  const configuredCorsOrigins = configService.get<string>(
+    'app.corsOrigins',
+    'http://localhost:5173,http://127.0.0.1:5173',
+  );
+  const allowedOrigins = configuredCorsOrigins
+    .split(',')
+    .map((origin) => origin.trim())
+    .filter((origin) => origin.length > 0);
+
+  app.enableCors({
+    origin: (
+      origin: string | undefined,
+      callback: (error: Error | null, allow?: boolean) => void,
+    ) => {
+      if (!origin || allowedOrigins.includes(origin)) {
+        callback(null, true);
+        return;
+      }
+      callback(new Error(`CORS blocked for origin: ${origin}`), false);
+    },
+    credentials: true,
+    methods: ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE', 'OPTIONS'],
+    allowedHeaders: [
+      'Content-Type',
+      'Authorization',
+      'x-company-id',
+      'x-workspace-id',
+    ],
+  });
 
   const swaggerConfig = new DocumentBuilder()
     .setTitle('Enterprise AI Knowledge Platform API')
