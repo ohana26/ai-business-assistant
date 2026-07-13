@@ -7,6 +7,7 @@ export class OllamaProvider implements AIProvider {
   private readonly logger = new Logger(OllamaProvider.name);
   private readonly baseUrl: string;
   private readonly model: string;
+  private readonly keepAlive: string;
 
   constructor(private readonly configService: ConfigService) {
     this.baseUrl = this.configService.get<string>(
@@ -16,6 +17,10 @@ export class OllamaProvider implements AIProvider {
     this.model = this.configService.get<string>(
       'app.ollamaChatModel',
       'llama3.2:3b',
+    );
+    this.keepAlive = this.configService.get<string>(
+      'app.ollamaKeepAlive',
+      '5m',
     );
   }
 
@@ -27,6 +32,7 @@ export class OllamaProvider implements AIProvider {
         model: this.model,
         prompt,
         stream: false,
+        keep_alive: this.keepAlive,
       }),
     });
     if (!response.ok) {

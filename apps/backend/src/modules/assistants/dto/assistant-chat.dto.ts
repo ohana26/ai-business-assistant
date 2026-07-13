@@ -1,5 +1,6 @@
-import { ApiProperty } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
+  IsBoolean,
   IsNotEmpty,
   IsOptional,
   IsString,
@@ -22,4 +23,13 @@ export class AssistantChatDto {
   @IsOptional()
   @IsUUID()
   conversationId?: string;
+
+  @ApiPropertyOptional({
+    description:
+      'When true, includes retrieval/prompt/latency diagnostics in the response for debugging.',
+    default: false,
+  })
+  @IsOptional()
+  @IsBoolean()
+  debug?: boolean;
 }

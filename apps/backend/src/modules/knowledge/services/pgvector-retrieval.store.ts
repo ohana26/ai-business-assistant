@@ -23,6 +23,16 @@ export class PgVectorRetrievalStore implements RetrievalStore {
         chunkId: string;
         chunkContent: string;
         chunkIndex: number;
+        chunkMetadata: {
+          pageNumber?: number;
+          section?: string;
+          document?: {
+            assetId: string;
+            filename: string;
+            title: string;
+            contentType?: string;
+          };
+        } | null;
         assetId: string;
         assetTitle: string;
         assetFilename: string;
@@ -34,6 +44,7 @@ export class PgVectorRetrievalStore implements RetrievalStore {
           c.id AS "chunkId",
           c.content AS "chunkContent",
           c."chunkIndex" AS "chunkIndex",
+          c.metadata AS "chunkMetadata",
           ka.id AS "assetId",
           ka.title AS "assetTitle",
           ka.filename AS "assetFilename",
@@ -63,6 +74,9 @@ export class PgVectorRetrievalStore implements RetrievalStore {
       query.topK,
     );
 
-    return rows;
+    return rows.map((row) => ({
+      ...row,
+      chunkMetadata: row.chunkMetadata ?? undefined,
+    }));
   }
 }

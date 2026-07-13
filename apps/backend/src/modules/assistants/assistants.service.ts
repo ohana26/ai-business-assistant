@@ -133,6 +133,7 @@ export class AssistantsService {
     workspaceId?: string;
     message: string;
     conversationId?: string;
+    debug?: boolean;
   }) {
     const { companyId, workspaceId } = await this.assertWorkspaceAccess(
       params.userContext,
@@ -218,6 +219,7 @@ export class AssistantsService {
     });
 
     const startedAt = Date.now();
+    const retrievalStartedAt = Date.now();
     let retrievedChunks = [] as Awaited<
       ReturnType<RetrievalService['retrieveRelevantChunks']>
     >;
@@ -232,21 +234,39 @@ export class AssistantsService {
       retrievalError =
         error instanceof Error ? error.message : 'Unknown retrieval error';
     }
+    const retrievalLatency = Date.now() - retrievalStartedAt;
+
     const prompt = this.promptBuilderService.buildPrompt({
       companyId,
       workspaceId,
       userMessage: params.message,
       chunks: retrievedChunks,
-      conversationHistory: conversationHistory
-        .reverse()
-        .map((message) => ({
-          role: message.role,
-          content: message.content,
-        })),
+      conversationHistory: conversationHistory.reverse().map((message) => ({
+        role: message.role,
+        content: message.content,
+      })),
     });
+    const promptCharacterCount = prompt.length;
+    const promptEstimatedTokens = Math.ceil(promptCharacterCount / 4);
+
     const chatProvider = this.aiProvidersService.getChatProvider();
+    const generationStartedAt = Date.now();
     const answer = await chatProvider.generateResponse(prompt);
+    const generationLatency = Date.now() - generationStartedAt;
     const latency = Date.now() - startedAt;
+    const retrievalSettings = this.retrievalService.getSettings();
+    const documentsUsed = Array.from(
+      new Map(
+        retrievedChunks.map((chunk) => [
+          chunk.assetId,
+          {
+            assetId: chunk.assetId,
+            filename: chunk.assetFilename,
+            title: chunk.assetTitle,
+          },
+        ]),
+      ).values(),
+    );
 
     const assistantMessage = await this.prisma.message.create({
       data: {
@@ -288,16 +308,24 @@ export class AssistantsService {
         workspaceId,
         model: chatProvider.getModelName(),
         latency,
+        retrievalLatency,
+        generationLatency,
+        promptCharacterCount,
+        promptEstimatedTokens,
+        retrievalSettings,
+        documentsUsed,
         retrievalError,
         retrievedChunks: retrievedChunks.map((chunk) => ({
           chunkId: chunk.chunkId,
           assetId: chunk.assetId,
           score: chunk.similarityScore,
+          pageNumber: chunk.chunkMetadata?.pageNumber,
+          section: chunk.chunkMetadata?.section,
         })),
       },
     });
 
-    return {
+    const response = {
       conversationId: conversation.id,
       answer,
       sources: retrievedChunks.map((chunk) => ({
@@ -306,7 +334,41 @@ export class AssistantsService {
         filename: chunk.assetFilename,
         title: chunk.assetTitle,
         similarityScore: chunk.similarityScore,
+        pageNumber: chunk.chunkMetadata?.pageNumber,
+        section: chunk.chunkMetadata?.section,
       })),
+    };
+
+    if (!params.debug) {
+      return response;
+    }
+
+    return {
+      ...response,
+      debug: {
+        retrievalSettings,
+        prompt: {
+          characterCount: promptCharacterCount,
+          estimatedTokens: promptEstimatedTokens,
+        },
+        latency: {
+          totalMs: latency,
+          retrievalMs: retrievalLatency,
+          generationMs: generationLatency,
+        },
+        documentsUsed,
+        retrievedChunks: retrievedChunks.map((chunk) => ({
+          chunkId: chunk.chunkId,
+          chunkIndex: chunk.chunkIndex,
+          assetId: chunk.assetId,
+          filename: chunk.assetFilename,
+          title: chunk.assetTitle,
+          similarityScore: chunk.similarityScore,
+          metadata: chunk.chunkMetadata ?? null,
+          content: chunk.chunkContent,
+        })),
+        retrievalError,
+      },
     };
   }
 

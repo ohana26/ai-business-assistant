@@ -52,10 +52,14 @@ export class AuthService {
       },
     });
 
-    const onboarding = await this.provisionDefaultTenantContext(user.id, user.email, {
-      companyName: registerDto.companyName,
-      workspaceName: registerDto.workspaceName,
-    });
+    const onboarding = await this.provisionDefaultTenantContext(
+      user.id,
+      user.email,
+      {
+        companyName: registerDto.companyName,
+        workspaceName: registerDto.workspaceName,
+      },
+    );
 
     await this.auditService.logUserCreation(user.id, user.id, {
       email: user.email,
@@ -197,10 +201,10 @@ export class AuthService {
     const emailPrefix = email.split('@')[0] ?? 'company';
     const companyName =
       options?.companyName?.trim() || `${emailPrefix} Company`;
-    const workspaceName =
-      options?.workspaceName?.trim() || 'Default Workspace';
+    const workspaceName = options?.workspaceName?.trim() || 'Default Workspace';
     const collectionName = 'General';
-    const baseSlug = this.toSlug(companyName) || this.toSlug(emailPrefix) || 'company';
+    const baseSlug =
+      this.toSlug(companyName) || this.toSlug(emailPrefix) || 'company';
     const suffix = randomUUID().slice(0, 8);
     const companySlug = `${baseSlug}-${suffix}`;
     const workspaceSlug = this.toSlug(workspaceName) || 'workspace';
@@ -303,19 +307,21 @@ export class AuthService {
       return this.provisionDefaultTenantContext(userId, email);
     }
 
-    const workspaceMembership = await this.prisma.workspaceMembership.findFirst({
-      where: {
-        membershipId: activeMembership.id,
-        deletedAt: null,
-        workspace: {
-          companyId: activeMembership.companyId,
-          status: 'ACTIVE',
+    const workspaceMembership = await this.prisma.workspaceMembership.findFirst(
+      {
+        where: {
+          membershipId: activeMembership.id,
           deletedAt: null,
+          workspace: {
+            companyId: activeMembership.companyId,
+            status: 'ACTIVE',
+            deletedAt: null,
+          },
         },
+        select: { workspaceId: true },
+        orderBy: { createdAt: 'asc' },
       },
-      select: { workspaceId: true },
-      orderBy: { createdAt: 'asc' },
-    });
+    );
     if (!workspaceMembership) {
       const workspace = await this.prisma.workspace.create({
         data: {

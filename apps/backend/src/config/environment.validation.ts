@@ -66,6 +66,11 @@ class EnvironmentVariables {
 
   @IsOptional()
   @IsString()
+  @Matches(/^\d+[smhd]$/i)
+  OLLAMA_KEEP_ALIVE?: string;
+
+  @IsOptional()
+  @IsString()
   OLLAMA_EMBED_MODEL?: string;
 
   @IsOptional()
@@ -79,6 +84,10 @@ class EnvironmentVariables {
   @IsOptional()
   @IsNumberString()
   RETRIEVAL_TOP_K?: string;
+
+  @IsOptional()
+  @Matches(/^(0(\.\d+)?|1(\.0+)?)$/)
+  MIN_SIMILARITY_SCORE?: string;
 }
 
 export function validateEnvironment(
