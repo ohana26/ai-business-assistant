@@ -8,6 +8,7 @@ import { AiProvidersModule } from '../ai-providers/ai-providers.module';
 import { KnowledgeModule } from '../knowledge/knowledge.module';
 import { PromptBuilderService } from './services/prompt-builder.service';
 import { MemoryService } from './services/memory.service';
+import { ConversationContextService } from './services/conversation-context.service';
 
 @Module({
   imports: [
@@ -18,6 +19,11 @@ import { MemoryService } from './services/memory.service';
     KnowledgeModule,
   ],
   controllers: [AssistantsController],
-  providers: [AssistantsService, PromptBuilderService, MemoryService],
+  providers: [
+    AssistantsService,
+    PromptBuilderService,
+    MemoryService,
+    ConversationContextService,
+  ],
 })
 export class AssistantsModule {}

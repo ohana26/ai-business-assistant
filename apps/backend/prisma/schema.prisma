@@ -94,6 +94,12 @@ enum MessageRole {
   SYSTEM
 }
 
+enum FactImportance {
+  LOW
+  MEDIUM
+  HIGH
+}
+
 model User {
   id                  String       @id @default(uuid()) @db.Uuid
   email               String       @unique
@@ -110,6 +116,7 @@ model User {
   createdKnowledgeAssets KnowledgeAsset[] @relation("KnowledgeAssetCreatedBy")
   conversations       Conversation[]
   messages            Message[]
+  conversationFacts   ConversationFact[]
   memories            UserMemory[]
   userAssistantProfiles UserAssistantProfile[]
   createdAt           DateTime     @default(now())
@@ -186,6 +193,7 @@ model Company {
   embeddings          Embedding[]
   conversations       Conversation[]
   messages            Message[]
+  conversationFacts   ConversationFact[]
   userMemories        UserMemory[]
   assistantProfiles   AssistantProfile[]
   createdAt   DateTime     @default(now())
@@ -488,12 +496,41 @@ model Conversation {
   workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
   user        User      @relation(fields: [userId], references: [id], onDelete: Restrict)
   messages    Message[]
+  summary     ConversationSummary?
+  facts       ConversationFact[]
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
   deletedAt   DateTime?
 
   @@index([companyId, workspaceId, userId, createdAt])
   @@index([deletedAt])
+}
+
+model ConversationSummary {
+  id             String       @id @default(uuid()) @db.Uuid
+  conversationId String       @unique @db.Uuid
+  summary        String
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  @@index([conversationId])
+}
+
+model ConversationFact {
+  id             String         @id @default(uuid()) @db.Uuid
+  conversationId String         @db.Uuid
+  companyId      String         @db.Uuid
+  userId         String         @db.Uuid
+  fact           String
+  importance     FactImportance @default(MEDIUM)
+  conversation   Conversation   @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  company        Company        @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  user           User           @relation(fields: [userId], references: [id], onDelete: Restrict)
+  createdAt      DateTime       @default(now())
+
+  @@index([conversationId, createdAt])
+  @@index([companyId, userId, importance])
 }
 
 model Message {

@@ -18,6 +18,16 @@ export class PromptBuilderService {
       importance: number;
       createdAt: string;
     }>;
+    conversationSummary: string | null;
+    conversationFacts: Array<{
+      fact: string;
+      importance: 'LOW' | 'MEDIUM' | 'HIGH';
+      createdAt: string;
+    }>;
+    recentMessages: Array<{
+      role: 'USER' | 'ASSISTANT' | 'SYSTEM';
+      content: string;
+    }>;
     assistantProfile: {
       name: string;
       systemPrompt: string;
@@ -35,10 +45,19 @@ export class PromptBuilderService {
     const historyText = params.conversationHistory
       .map((message) => `${message.role}: ${message.content}`)
       .join('\n');
+    const recentMessagesText = params.recentMessages
+      .map((message) => `${message.role}: ${message.content}`)
+      .join('\n');
     const memoriesText = params.userMemories
       .map(
         (memory, index) =>
           `[Memory ${index + 1} | Type: ${memory.type} | Importance: ${memory.importance} | CreatedAt: ${memory.createdAt}]\n${memory.content}`,
+      )
+      .join('\n\n');
+    const factsText = params.conversationFacts
+      .map(
+        (fact, index) =>
+          `[Fact ${index + 1} | Importance: ${fact.importance} | CreatedAt: ${fact.createdAt}]\n${fact.fact}`,
       )
       .join('\n\n');
     const hasContext = params.chunks.length > 0;
@@ -66,14 +85,20 @@ export class PromptBuilderService {
       `User preferences: ${profilePreferencesText}`,
       `User personal prompt: ${params.assistantProfile.personalPrompt ?? '[None]'}`,
       '',
-      'Conversation history:',
-      historyText || '[No prior messages]',
-      '',
-      'User memory context:',
+      'USER MEMORY:',
       memoriesText || '[No relevant user memories found]',
       '',
-      'Context:',
+      'CONVERSATION SUMMARY:',
+      params.conversationSummary ?? '[No summary available]',
+      '',
+      'IMPORTANT FACTS:',
+      factsText || '[No important facts captured]',
+      '',
+      'RELEVANT KNOWLEDGE:',
       hasContext ? contextText : '[No relevant context found]',
+      '',
+      'RECENT MESSAGES:',
+      recentMessagesText || historyText || '[No prior messages]',
       '',
       `User question: ${params.userMessage}`,
       '',

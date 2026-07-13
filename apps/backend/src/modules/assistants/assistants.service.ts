@@ -17,6 +17,7 @@ import { AiProvidersService } from '../ai-providers/ai-providers.service';
 import { RetrievalService } from '../knowledge/services/retrieval.service';
 import { PromptBuilderService } from './services/prompt-builder.service';
 import { MemoryService } from './services/memory.service';
+import { ConversationContextService } from './services/conversation-context.service';
 
 @Injectable()
 export class AssistantsService {
@@ -27,6 +28,7 @@ export class AssistantsService {
     private readonly aiProvidersService: AiProvidersService,
     private readonly auditService: AuditService,
     private readonly memoryService: MemoryService,
+    private readonly conversationContextService: ConversationContextService,
   ) {}
 
   async listConversations(params: {
@@ -210,21 +212,19 @@ export class AssistantsService {
       },
     });
 
-    const conversationHistory = await this.prisma.message.findMany({
-      where: {
+    await this.conversationContextService.extractAndStoreFactsFromUserMessage({
+      conversationId: conversation.id,
+      companyId,
+      userId: params.userContext.userId,
+      message: params.message,
+    });
+
+    const conversationContext =
+      await this.conversationContextService.loadContext({
         conversationId: conversation.id,
         companyId,
         workspaceId,
-        deletedAt: null,
-        role: { in: [MessageRole.USER, MessageRole.ASSISTANT] },
-      },
-      orderBy: { createdAt: 'desc' },
-      take: 12,
-      select: {
-        role: true,
-        content: true,
-      },
-    });
+      });
     const memoryContext = await this.memoryService.getMemoryContext({
       userId: params.userContext.userId,
       companyId,
@@ -254,10 +254,19 @@ export class AssistantsService {
       workspaceId,
       userMessage: params.message,
       chunks: retrievedChunks,
-      conversationHistory: conversationHistory.reverse().map((message) => ({
-        role: message.role,
-        content: message.content,
+      conversationHistory: conversationContext.recentMessages.map(
+        (message) => ({
+          role: message.role,
+          content: message.content,
+        }),
+      ),
+      conversationSummary: conversationContext.summary,
+      conversationFacts: conversationContext.importantFacts.map((fact) => ({
+        fact: fact.fact,
+        importance: fact.importance,
+        createdAt: fact.createdAt,
       })),
+      recentMessages: conversationContext.recentMessages,
       userMemories: memoryContext.memories,
       assistantProfile: memoryContext.assistantProfile,
     });
@@ -311,6 +320,11 @@ export class AssistantsService {
       where: { id: conversation.id },
       data: { updatedAt: new Date() },
     });
+    await this.conversationContextService.refreshSummary({
+      conversationId: conversation.id,
+      companyId,
+      workspaceId,
+    });
 
     await this.auditService.log({
       companyId,
@@ -329,6 +343,8 @@ export class AssistantsService {
         promptEstimatedTokens,
         retrievalSettings,
         documentsUsed,
+        conversationSummary: conversationContext.summary,
+        conversationFactCount: conversationContext.importantFacts.length,
         memoryCount: memoryContext.memories.length,
         assistantProfileId: memoryContext.assistantProfile.id,
         retrievalError,
@@ -374,6 +390,11 @@ export class AssistantsService {
           assistantProfileId: memoryContext.assistantProfile.id,
           assistantProfileName: memoryContext.assistantProfile.name,
           items: memoryContext.memories,
+        },
+        conversation: {
+          summary: conversationContext.summary,
+          importantFacts: conversationContext.importantFacts,
+          recentMessages: conversationContext.recentMessages,
         },
         prompt: {
           characterCount: promptCharacterCount,
