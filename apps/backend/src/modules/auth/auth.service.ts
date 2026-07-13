@@ -294,6 +294,7 @@ export class AuthService {
         },
       },
       select: {
+        id: true,
         companyId: true,
       },
     });
@@ -302,23 +303,74 @@ export class AuthService {
       return this.provisionDefaultTenantContext(userId, email);
     }
 
-    const workspace = await this.prisma.workspace.findFirst({
+    const workspaceMembership = await this.prisma.workspaceMembership.findFirst({
       where: {
-        companyId: activeMembership.companyId,
-        status: 'ACTIVE',
+        membershipId: activeMembership.id,
         deletedAt: null,
+        workspace: {
+          companyId: activeMembership.companyId,
+          status: 'ACTIVE',
+          deletedAt: null,
+        },
       },
-      select: { id: true },
+      select: { workspaceId: true },
       orderBy: { createdAt: 'asc' },
     });
-    if (!workspace) {
-      return this.provisionDefaultTenantContext(userId, email);
+    if (!workspaceMembership) {
+      const workspace = await this.prisma.workspace.create({
+        data: {
+          companyId: activeMembership.companyId,
+          name: 'Default Workspace',
+          slug: `workspace-${randomUUID().slice(0, 8)}`,
+          description: 'Workspace created during login recovery',
+          status: 'ACTIVE',
+        },
+        select: { id: true },
+      });
+
+      await this.prisma.workspaceMembership.create({
+        data: {
+          membershipId: activeMembership.id,
+          workspaceId: workspace.id,
+          workspaceRole: 'MEMBER',
+        },
+      });
+
+      const knowledgeBase = await this.prisma.knowledgeBase.create({
+        data: {
+          companyId: activeMembership.companyId,
+          workspaceId: workspace.id,
+          name: 'Default Workspace Knowledge Base',
+          slug: `workspace-kb-${randomUUID().slice(0, 8)}`,
+          description: 'Knowledge base created during login recovery',
+          status: 'ACTIVE',
+        },
+        select: { id: true },
+      });
+
+      const collection = await this.prisma.collection.create({
+        data: {
+          companyId: activeMembership.companyId,
+          knowledgeBaseId: knowledgeBase.id,
+          name: 'General',
+          slug: `general-${randomUUID().slice(0, 8)}`,
+          description: 'Default collection created during login recovery',
+          status: 'ACTIVE',
+        },
+        select: { id: true },
+      });
+
+      return {
+        companyId: activeMembership.companyId,
+        workspaceId: workspace.id,
+        collectionId: collection.id,
+      };
     }
 
     const knowledgeBase = await this.prisma.knowledgeBase.findFirst({
       where: {
         companyId: activeMembership.companyId,
-        workspaceId: workspace.id,
+        workspaceId: workspaceMembership.workspaceId,
         status: 'ACTIVE',
         deletedAt: null,
       },
@@ -326,7 +378,34 @@ export class AuthService {
       orderBy: { createdAt: 'asc' },
     });
     if (!knowledgeBase) {
-      return this.provisionDefaultTenantContext(userId, email);
+      const createdKnowledgeBase = await this.prisma.knowledgeBase.create({
+        data: {
+          companyId: activeMembership.companyId,
+          workspaceId: workspaceMembership.workspaceId,
+          name: 'Default Workspace Knowledge Base',
+          slug: `workspace-kb-${randomUUID().slice(0, 8)}`,
+          description: 'Knowledge base created during login recovery',
+          status: 'ACTIVE',
+        },
+        select: { id: true },
+      });
+      const createdCollection = await this.prisma.collection.create({
+        data: {
+          companyId: activeMembership.companyId,
+          knowledgeBaseId: createdKnowledgeBase.id,
+          name: 'General',
+          slug: `general-${randomUUID().slice(0, 8)}`,
+          description: 'Default collection created during login recovery',
+          status: 'ACTIVE',
+        },
+        select: { id: true },
+      });
+
+      return {
+        companyId: activeMembership.companyId,
+        workspaceId: workspaceMembership.workspaceId,
+        collectionId: createdCollection.id,
+      };
     }
 
     const collection = await this.prisma.collection.findFirst({
@@ -340,12 +419,28 @@ export class AuthService {
       orderBy: { createdAt: 'asc' },
     });
     if (!collection) {
-      return this.provisionDefaultTenantContext(userId, email);
+      const createdCollection = await this.prisma.collection.create({
+        data: {
+          companyId: activeMembership.companyId,
+          knowledgeBaseId: knowledgeBase.id,
+          name: 'General',
+          slug: `general-${randomUUID().slice(0, 8)}`,
+          description: 'Default collection created during login recovery',
+          status: 'ACTIVE',
+        },
+        select: { id: true },
+      });
+
+      return {
+        companyId: activeMembership.companyId,
+        workspaceId: workspaceMembership.workspaceId,
+        collectionId: createdCollection.id,
+      };
     }
 
     return {
       companyId: activeMembership.companyId,
-      workspaceId: workspace.id,
+      workspaceId: workspaceMembership.workspaceId,
       collectionId: collection.id,
     };
   }
