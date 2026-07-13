@@ -133,11 +133,65 @@ Retry policy:
 
 MVP includes:
 - connector interface definition
-- PDF connector implementation
-- manual sync trigger
-- ingestion status and error visibility
+- connector registry and pluggable resolution by `KnowledgeSource.sourceType`
+- connector sync service and placeholder sync orchestration layer
+- audit lifecycle events for connect/disconnect/sync
+- manual and external placeholder connectors (no real vendor integrations yet)
 
 MVP excludes:
 - scheduled sync orchestration
 - webhook/event-driven sync
 - non-PDF connector implementations
+
+---
+
+## 10) Backend Framework Implementation Notes
+
+The backend connector framework is implemented as a pluggable module with these core parts:
+
+- `Connector` interface
+  - `authenticate()`
+  - `validateConnection()`
+  - `sync()`
+  - `fetch()`
+  - `disconnect()`
+- `ConnectorRegistryService`
+  - resolves connector implementations using `KnowledgeSource.sourceType`
+- `ConnectorSyncService`
+  - executes connector lifecycle
+  - persists/updates `KnowledgeAsset` + `DocumentMetadata`
+  - records sync audit events
+- `ConnectorSyncOrchestratorService`
+  - placeholder orchestration for ad-hoc and future scheduled sync sweeps
+
+OAuth and credential handling readiness:
+- connector configs support auth methods: `oauth2`, `api-key`, `basic-auth`, `service-account`
+- only credential references are accepted (`credentialReference`)
+- raw credential material is intentionally rejected at connector validation boundary
+
+Audit events emitted by framework:
+- `connector.connected`
+- `connector.disconnected`
+- `connector.sync.started`
+- `connector.sync.completed`
+- `connector.sync.failed`
+
+---
+
+## 11) How to Add a New Connector (Without Changing Core Logic)
+
+To add a connector (for example Google Drive, Gmail, Slack, Salesforce, PostgreSQL, REST API):
+
+1. Create a class implementing `Connector`.
+2. Add the supported `sourceTypes` mapping.
+3. Implement lifecycle methods (`authenticate`, `validateConnection`, `sync`, `fetch`, `disconnect`).
+4. Register the class as a provider in `ConnectorsModule`.
+5. Add source-specific parsing in the connector class only.
+
+No changes are required in:
+- `ConnectorRegistryService`
+- `ConnectorSyncService`
+- orchestration logic
+- business modules using connectors
+
+This keeps integrations extensible and avoids modifying existing business flow when new connectors are introduced.
