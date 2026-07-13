@@ -5,12 +5,15 @@ import { PromptBuilderService } from '../assistants/services/prompt-builder.serv
 import { AssistantIntent } from './assistant-intent.enum';
 import { IntentRouterService } from './services/intent-router.service';
 import { ToolPlannerService } from './services/tool-planner.service';
+import { ExecutionEngineService } from './services/execution-engine.service';
 import type { ToolExecutionPlan } from './interfaces/tool-execution-plan.interface';
+import type { ToolExecutionResult } from './interfaces/tool-execution-result.interface';
 
 export interface AssistantBrainResult {
   intent: AssistantIntent;
   answer: string;
   toolPlan: ToolExecutionPlan | null;
+  toolExecution: ToolExecutionResult | null;
   modelName: string | null;
   retrievalLatency: number;
   generationLatency: number;
@@ -45,6 +48,7 @@ export class AssistantBrainService {
     private readonly retrievalService: RetrievalService,
     private readonly promptBuilderService: PromptBuilderService,
     private readonly aiProvidersService: AiProvidersService,
+    private readonly executionEngineService: ExecutionEngineService,
   ) {}
 
   async orchestrate(params: {
@@ -79,6 +83,8 @@ export class AssistantBrainService {
       personalPrompt: string | null;
       preferences: unknown;
     };
+    userId: string;
+    conversationId: string;
   }): Promise<AssistantBrainResult> {
     const intent = this.intentRouterService.classify({
       message: params.userMessage,
@@ -94,6 +100,7 @@ export class AssistantBrainService {
     let promptEstimatedTokens = 0;
     let modelName: string | null = null;
     let toolPlan: ToolExecutionPlan | null = null;
+    let toolExecution: ToolExecutionResult | null = null;
     let retrievedChunks = [] as Awaited<
       ReturnType<RetrievalService['retrieveRelevantChunks']>
     >;
@@ -120,6 +127,16 @@ export class AssistantBrainService {
     if (intent === AssistantIntent.ACTION || intent === AssistantIntent.MIXED) {
       toolPlan = this.toolPlannerService.buildPlan({
         message: params.userMessage,
+      });
+    }
+
+    if (intent === AssistantIntent.ACTION && toolPlan) {
+      toolExecution = await this.executionEngineService.executePlan({
+        plan: toolPlan,
+        companyId: params.companyId,
+        userId: params.userId,
+        conversationId: params.conversationId,
+        confirmedByUser: !toolPlan.requiresUserConfirmation,
       });
     }
 
@@ -150,7 +167,7 @@ export class AssistantBrainService {
       generationLatency = Date.now() - generationStartedAt;
       modelName = chatProvider.getModelName();
     } else {
-      answer = this.buildActionPlanningMessage(toolPlan);
+      answer = this.buildActionExecutionMessage(toolPlan, toolExecution);
     }
 
     const documentsUsed = Array.from(
@@ -170,6 +187,7 @@ export class AssistantBrainService {
       intent,
       answer,
       toolPlan,
+      toolExecution,
       modelName,
       retrievalLatency,
       generationLatency,
@@ -191,15 +209,22 @@ export class AssistantBrainService {
     };
   }
 
-  private buildActionPlanningMessage(toolPlan: ToolExecutionPlan | null) {
+  private buildActionExecutionMessage(
+    toolPlan: ToolExecutionPlan | null,
+    toolExecution: ToolExecutionResult | null,
+  ) {
     if (!toolPlan) {
-      return 'I identified this as an action request. I prepared a tool plan, but I need more details before execution can be requested.';
+      return 'I identified this as an action request, but I could not construct a valid execution plan yet.';
     }
 
-    if (toolPlan.missingInformation.length > 0) {
-      return `I prepared a tool execution plan for "${toolPlan.toolName}". Before execution can be requested, please provide: ${toolPlan.missingInformation.join(', ')}.`;
+    if (!toolExecution) {
+      return `I prepared a tool execution plan for "${toolPlan.toolName}", but it has not been executed yet.`;
     }
 
-    return `I prepared a tool execution plan for "${toolPlan.toolName}". No action has been executed yet.`;
+    if (!toolExecution.success) {
+      return `I prepared an execution request for "${toolPlan.toolName}", but it did not complete. Reason: ${toolExecution.message}.`;
+    }
+
+    return `Execution completed via "${toolPlan.toolName}". Result: ${toolExecution.message}.`;
   }
 }

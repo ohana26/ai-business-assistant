@@ -247,6 +247,8 @@ export class AssistantsService {
       recentMessages: conversationContext.recentMessages,
       userMemories: memoryContext.memories,
       assistantProfile: memoryContext.assistantProfile,
+      userId: params.userContext.userId,
+      conversationId: conversation.id,
     });
     const latency = Date.now() - startedAt;
 
@@ -318,6 +320,16 @@ export class AssistantsService {
                 brainResult.toolPlan.requiresUserConfirmation,
             }
           : null,
+        toolExecution: brainResult.toolExecution
+          ? {
+              executionId: brainResult.toolExecution.executionId,
+              success: brainResult.toolExecution.success,
+              toolName: brainResult.toolExecution.toolName,
+              message: brainResult.toolExecution.message,
+              errorCode: brainResult.toolExecution.errorCode ?? null,
+              data: brainResult.toolExecution.data ?? null,
+            }
+          : null,
         retrievedChunks: brainResult.retrievedChunks.map((chunk) => ({
           chunkId: chunk.chunkId,
           assetId: chunk.assetId,
@@ -333,6 +345,7 @@ export class AssistantsService {
       intent: brainResult.intent,
       answer: brainResult.answer,
       toolPlan: brainResult.toolPlan,
+      toolExecution: brainResult.toolExecution,
       sources: brainResult.sources,
     };
 
@@ -351,6 +364,7 @@ export class AssistantsService {
         retrievalSettings: brainResult.retrievalSettings,
         intent: brainResult.intent,
         toolPlan: brainResult.toolPlan,
+        toolExecution: brainResult.toolExecution,
         memory: {
           count: memoryContext.memories.length,
           assistantProfileId: memoryContext.assistantProfile.id,
