@@ -1,17 +1,13 @@
 import DashboardOutlinedIcon from "@mui/icons-material/DashboardOutlined";
 import HubOutlinedIcon from "@mui/icons-material/HubOutlined";
-import SmartToyOutlinedIcon from "@mui/icons-material/SmartToyOutlined";
 import ChatBubbleOutlineOutlinedIcon from "@mui/icons-material/ChatBubbleOutlineOutlined";
-import SettingsOutlinedIcon from "@mui/icons-material/SettingsOutlined";
 import { Box, List, ListItemButton, ListItemIcon, ListItemText, Typography } from "@mui/material";
 import { Link as RouterLink, useLocation } from "react-router-dom";
 
 const navigationItems = [
   { label: "Dashboard", path: "/dashboard", icon: <DashboardOutlinedIcon fontSize="small" /> },
   { label: "Knowledge", path: "/knowledge", icon: <HubOutlinedIcon fontSize="small" /> },
-  { label: "Assistants", path: "/assistants", icon: <SmartToyOutlinedIcon fontSize="small" /> },
   { label: "Chat", path: "/chat", icon: <ChatBubbleOutlineOutlinedIcon fontSize="small" /> },
-  { label: "Settings", path: "/settings", icon: <SettingsOutlinedIcon fontSize="small" /> },
 ];
 
 export function AppSidebar() {
@@ -21,7 +17,7 @@ export function AppSidebar() {
     <Box
       component="aside"
       sx={{
-        width: 260,
+        width: { xs: 74, md: 260 },
         borderRight: "1px solid",
         borderColor: "divider",
         backgroundColor: "background.paper",
@@ -30,7 +26,12 @@ export function AppSidebar() {
       }}
     >
       <Typography variant="h6" sx={{ fontWeight: 700, mb: 2.5 }}>
-        Enterprise AI Platform
+        <Box component="span" sx={{ display: { xs: "none", md: "inline" } }}>
+          AI Console
+        </Box>
+        <Box component="span" sx={{ display: { xs: "inline", md: "none" } }}>
+          AI
+        </Box>
       </Typography>
 
       <List sx={{ py: 0 }}>
@@ -49,7 +50,10 @@ export function AppSidebar() {
               }}
             >
               <ListItemIcon sx={{ minWidth: 34 }}>{item.icon}</ListItemIcon>
-              <ListItemText primary={item.label} />
+              <ListItemText
+                primary={item.label}
+                sx={{ display: { xs: "none", md: "block" } }}
+              />
             </ListItemButton>
           );
         })}

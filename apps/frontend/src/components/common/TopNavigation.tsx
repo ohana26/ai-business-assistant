@@ -1,7 +1,22 @@
-import SearchIcon from "@mui/icons-material/Search";
-import { Avatar, Box, IconButton, InputAdornment, TextField, Typography } from "@mui/material";
+import LogoutOutlinedIcon from "@mui/icons-material/LogoutOutlined";
+import { Box, Button, Chip, Typography } from "@mui/material";
+import { useNavigate } from "react-router-dom";
+import { useAuthStore } from "../../store/authStore";
+import { useWorkspaceStore } from "../../store/workspaceStore";
 
 export function TopNavigation() {
+  const navigate = useNavigate();
+  const clearAuth = useAuthStore((state) => state.clearAuth);
+  const { companyId, workspaceId } = useWorkspaceStore((state) => ({
+    companyId: state.companyId,
+    workspaceId: state.workspaceId,
+  }));
+
+  const handleLogout = () => {
+    clearAuth();
+    navigate("/login", { replace: true });
+  };
+
   return (
     <Box
       component="header"
@@ -13,32 +28,23 @@ export function TopNavigation() {
         display: "flex",
         alignItems: "center",
         justifyContent: "space-between",
+        gap: 2,
         backgroundColor: "background.paper",
       }}
     >
-      <Typography variant="h6" sx={{ fontWeight: 600 }}>
-        AI Knowledge Platform
-      </Typography>
-
-      <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
-        <TextField
-          size="small"
-          placeholder="Search"
-          sx={{ width: 240 }}
-          slotProps={{
-            input: {
-              startAdornment: (
-                <InputAdornment position="start">
-                  <SearchIcon fontSize="small" />
-                </InputAdornment>
-              ),
-            },
-          }}
-        />
-        <IconButton aria-label="profile">
-          <Avatar sx={{ width: 32, height: 32 }}>EA</Avatar>
-        </IconButton>
+      <Box>
+        <Typography variant="h6" sx={{ fontWeight: 600 }}>
+          AI Business Assistant Console
+        </Typography>
+        <Box sx={{ display: "flex", gap: 1, mt: 0.5, flexWrap: "wrap" }}>
+          <Chip size="small" label={`Company: ${companyId || "Not set"}`} />
+          <Chip size="small" label={`Workspace: ${workspaceId || "Not set"}`} />
+        </Box>
       </Box>
+
+      <Button size="small" color="inherit" startIcon={<LogoutOutlinedIcon />} onClick={handleLogout}>
+        Logout
+      </Button>
     </Box>
   );
 }

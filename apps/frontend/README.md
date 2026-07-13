@@ -1,6 +1,4 @@
-# Frontend Application Foundation
-
-Phase 1.2 frontend foundation for the Enterprise AI Knowledge Platform.
+# AI Business Assistant Internal Console
 
 ## Stack
 
@@ -17,26 +15,22 @@ Phase 1.2 frontend foundation for the Enterprise AI Knowledge Platform.
 
 ```text
 src/
-  components/common/   # shared UI building blocks
-  layouts/             # app shells (dashboard layout)
-  pages/               # route pages and placeholders
-  features/            # domain modules (auth, dashboard, assistants, knowledge, chat, settings)
-  services/            # API service clients and adapters
-  hooks/               # reusable React hooks
-  store/               # Zustand stores
-  types/               # app and environment types
-  utils/               # constants and utility helpers
-  routes/              # route configuration
+  components/common/   # sidebar + top navigation
+  layouts/             # authenticated app shell
+  pages/               # Login, Dashboard, Knowledge, Chat
+  routes/              # route table + protected route
+  services/            # axios API client and endpoint functions
+  store/               # auth and company/workspace context state
+  hooks/               # app config utilities
+  types/               # environment typings
 ```
 
-## Available Routes
+## Implemented Routes
 
-- `/` -> Login placeholder
-- `/dashboard` -> Dashboard placeholder
-- `/knowledge` -> Knowledge placeholder
-- `/assistants` -> Assistants placeholder
-- `/chat` -> Chat placeholder
-- `/settings` -> Settings placeholder
+- `/login` -> email/password login (`POST /auth/login`)
+- `/dashboard` -> company/workspace context setup
+- `/knowledge` -> list/upload knowledge assets
+- `/chat` -> assistant chat with source display
 
 ## Environment Variables
 
@@ -46,8 +40,11 @@ Copy `.env.example` to `.env`:
 cp .env.example .env
 ```
 
-Current variables:
-- `VITE_API_BASE_URL` (default API base URL for Axios client)
+Variables:
+- `VITE_API_BASE_URL` (backend base URL, default `http://localhost:3000`)
+- `VITE_DEFAULT_COMPANY_ID` (optional)
+- `VITE_DEFAULT_WORKSPACE_ID` (optional)
+- `VITE_DEFAULT_COLLECTION_ID` (optional)
 
 ## Run Locally
 
@@ -58,16 +55,8 @@ npm install
 npm run dev -w frontend
 ```
 
-Or from this directory:
+Build:
 
 ```bash
-npm install
-npm run dev
-```
-
-## Quality Scripts
-
-```bash
-npm run lint
-npm run build
+npm run build -w frontend
 ```
