@@ -14,6 +14,8 @@ export function LoginPage() {
   const setContext = useWorkspaceStore((state) => state.setContext);
   const [mode, setMode] = useState<"login" | "register">("login");
   const [displayName, setDisplayName] = useState("");
+  const [companyName, setCompanyName] = useState("");
+  const [workspaceName, setWorkspaceName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
 
@@ -65,6 +67,8 @@ export function LoginPage() {
       email,
       password,
       displayName: displayName.trim() || undefined,
+      companyName: companyName.trim() || undefined,
+      workspaceName: workspaceName.trim() || undefined,
     });
   };
 
@@ -110,12 +114,28 @@ export function LoginPage() {
                 <Alert severity="error">{String(registerError)}</Alert>
               ) : null}
               {mode === "register" ? (
-                <TextField
-                  label="Display Name (optional)"
-                  fullWidth
-                  value={displayName}
-                  onChange={(event) => setDisplayName(event.target.value)}
-                />
+                <>
+                  <TextField
+                    label="Display Name (optional)"
+                    fullWidth
+                    value={displayName}
+                    onChange={(event) => setDisplayName(event.target.value)}
+                  />
+                  <TextField
+                    label="Company Name"
+                    fullWidth
+                    value={companyName}
+                    onChange={(event) => setCompanyName(event.target.value)}
+                    helperText="Your organization/workspace owner account"
+                  />
+                  <TextField
+                    label="Workspace Name"
+                    fullWidth
+                    value={workspaceName}
+                    onChange={(event) => setWorkspaceName(event.target.value)}
+                    helperText="First workspace for your team"
+                  />
+                </>
               ) : null}
               <TextField
                 label="Email"

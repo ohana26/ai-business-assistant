@@ -1,4 +1,12 @@
-import { Body, Controller, Headers, Post, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Headers,
+  Param,
+  Post,
+  UseGuards,
+} from '@nestjs/common';
 import {
   ApiBearerAuth,
   ApiBody,
@@ -51,6 +59,64 @@ export class AssistantsController {
       workspaceId,
       message: body.message,
       conversationId: body.conversationId,
+    });
+  }
+
+  @ApiOperation({
+    summary: 'List assistant conversations for current workspace',
+  })
+  @ApiHeader({
+    name: 'x-company-id',
+    required: true,
+    description: 'Company context for tenant isolation',
+  })
+  @ApiHeader({
+    name: 'x-workspace-id',
+    required: true,
+    description: 'Workspace context for conversation isolation',
+  })
+  @Get('conversations')
+  @UseGuards(JwtAuthGuard, CurrentUserContextGuard, PermissionsGuard)
+  @RequirePermission(RBAC_PERMISSIONS.ASSISTANT_CHAT)
+  listConversations(
+    @CurrentUserContext() userContext: CurrentUserContextType,
+    @Headers('x-company-id') companyId: string | undefined,
+    @Headers('x-workspace-id') workspaceId: string | undefined,
+  ) {
+    return this.assistantsService.listConversations({
+      userContext,
+      companyId,
+      workspaceId,
+    });
+  }
+
+  @ApiOperation({
+    summary: 'List messages for a conversation',
+  })
+  @ApiHeader({
+    name: 'x-company-id',
+    required: true,
+    description: 'Company context for tenant isolation',
+  })
+  @ApiHeader({
+    name: 'x-workspace-id',
+    required: true,
+    description: 'Workspace context for conversation isolation',
+  })
+  @Get('conversations/:conversationId/messages')
+  @UseGuards(JwtAuthGuard, CurrentUserContextGuard, PermissionsGuard)
+  @RequirePermission(RBAC_PERMISSIONS.ASSISTANT_CHAT)
+  listConversationMessages(
+    @CurrentUserContext() userContext: CurrentUserContextType,
+    @Headers('x-company-id') companyId: string | undefined,
+    @Headers('x-workspace-id') workspaceId: string | undefined,
+    @Param('conversationId') conversationId: string,
+  ) {
+    return this.assistantsService.listConversationMessages({
+      userContext,
+      companyId,
+      workspaceId,
+      conversationId,
     });
   }
 }

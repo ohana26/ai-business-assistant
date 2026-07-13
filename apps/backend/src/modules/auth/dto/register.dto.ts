@@ -19,4 +19,14 @@ export class RegisterDto {
   @IsString()
   @MaxLength(120)
   displayName?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  companyName?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  workspaceName?: string;
 }

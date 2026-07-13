@@ -52,7 +52,10 @@ export class AuthService {
       },
     });
 
-    const onboarding = await this.provisionDefaultTenantContext(user.id, user.email);
+    const onboarding = await this.provisionDefaultTenantContext(user.id, user.email, {
+      companyName: registerDto.companyName,
+      workspaceName: registerDto.workspaceName,
+    });
 
     await this.auditService.logUserCreation(user.id, user.id, {
       email: user.email,
@@ -183,18 +186,34 @@ export class AuthService {
     };
   }
 
-  private async provisionDefaultTenantContext(userId: string, email: string) {
+  private async provisionDefaultTenantContext(
+    userId: string,
+    email: string,
+    options?: {
+      companyName?: string;
+      workspaceName?: string;
+    },
+  ) {
     const emailPrefix = email.split('@')[0] ?? 'company';
-    const baseSlug = this.toSlug(emailPrefix) || 'company';
+    const companyName =
+      options?.companyName?.trim() || `${emailPrefix} Company`;
+    const workspaceName =
+      options?.workspaceName?.trim() || 'Default Workspace';
+    const collectionName = 'General';
+    const baseSlug = this.toSlug(companyName) || this.toSlug(emailPrefix) || 'company';
     const suffix = randomUUID().slice(0, 8);
     const companySlug = `${baseSlug}-${suffix}`;
+    const workspaceSlug = this.toSlug(workspaceName) || 'workspace';
+    const knowledgeBaseName = `${workspaceName} Knowledge Base`;
+    const knowledgeBaseSlug = `${this.toSlug(workspaceName) || 'workspace'}-kb`;
+    const collectionSlug = this.toSlug(collectionName) || 'general';
 
     return this.prisma.$transaction(async (tx) => {
       const roleId = await this.ensureDefaultUserRole(tx);
 
       const company = await tx.company.create({
         data: {
-          name: `${emailPrefix} Company`,
+          name: companyName,
           slug: companySlug,
           status: 'ACTIVE',
         },
@@ -215,9 +234,9 @@ export class AuthService {
       const workspace = await tx.workspace.create({
         data: {
           companyId: company.id,
-          name: 'Default Workspace',
-          slug: 'default',
-          description: 'Auto-provisioned workspace for new user onboarding',
+          name: workspaceName,
+          slug: workspaceSlug,
+          description: 'Workspace created during onboarding',
           status: 'ACTIVE',
         },
         select: { id: true },
@@ -235,9 +254,9 @@ export class AuthService {
         data: {
           companyId: company.id,
           workspaceId: workspace.id,
-          name: 'Default Knowledge Base',
-          slug: 'default-kb',
-          description: 'Auto-provisioned knowledge base for manual uploads',
+          name: knowledgeBaseName,
+          slug: knowledgeBaseSlug,
+          description: 'Knowledge base created during onboarding',
           status: 'ACTIVE',
         },
         select: { id: true },
@@ -247,8 +266,8 @@ export class AuthService {
         data: {
           companyId: company.id,
           knowledgeBaseId: knowledgeBase.id,
-          name: 'General',
-          slug: 'general',
+          name: collectionName,
+          slug: collectionSlug,
           description: 'Default collection for uploaded documents',
           status: 'ACTIVE',
         },
