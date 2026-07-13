@@ -1,9 +1,11 @@
 import { useEffect, useState } from "react";
-import { Alert, Button, Paper, Stack, TextField, Typography } from "@mui/material";
+import { Alert, Button, Chip, Paper, Stack, TextField, Typography } from "@mui/material";
 import { Link as RouterLink } from "react-router-dom";
 import { useWorkspaceStore } from "../store/workspaceStore";
+import { useAuthStore } from "../store/authStore";
 
 export function DashboardPage() {
+  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
   const { companyId, workspaceId, collectionId, setContext } = useWorkspaceStore(
     (state) => ({
       companyId: state.companyId,
@@ -26,6 +28,36 @@ export function DashboardPage() {
 
   return (
     <Stack spacing={3}>
+      <Paper elevation={0} sx={{ p: 3, border: "1px solid", borderColor: "divider" }}>
+        <Stack spacing={1.5}>
+          <Typography variant="h5">Test Cycle Order</Typography>
+          <Typography variant="body2" color="text.secondary">
+            Follow these steps in sequence for full end-to-end testing.
+          </Typography>
+          <Stack spacing={1}>
+            <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
+              <Typography variant="body2">1) Register user in Login screen</Typography>
+              <Chip size="small" label={isAuthenticated ? "Done" : "Pending"} color={isAuthenticated ? "success" : "default"} />
+            </Stack>
+            <Typography variant="body2">2) Login and open Dashboard</Typography>
+            <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
+              <Typography variant="body2">3) Set Company + Workspace + Collection IDs</Typography>
+              <Chip size="small" label={hasContext ? "Done" : "Pending"} color={hasContext ? "success" : "default"} />
+            </Stack>
+            <Typography variant="body2">4) Go to Knowledge page and upload a document</Typography>
+            <Typography variant="body2">5) Go to Chat page, ask questions, continue same conversation</Typography>
+          </Stack>
+          <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5}>
+            <Button component={RouterLink} to="/knowledge" variant="outlined">
+              Step 4: Upload File
+            </Button>
+            <Button component={RouterLink} to="/chat" variant="outlined">
+              Step 5: Chat & Continue
+            </Button>
+          </Stack>
+        </Stack>
+      </Paper>
+
       <Paper elevation={0} sx={{ p: 3, border: "1px solid", borderColor: "divider" }}>
         <Stack spacing={2}>
           <Typography variant="h5">Dashboard</Typography>

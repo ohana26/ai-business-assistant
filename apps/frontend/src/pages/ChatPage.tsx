@@ -2,6 +2,7 @@ import { useState } from "react";
 import {
   Alert,
   Button,
+  Chip,
   Paper,
   Stack,
   TextField,
@@ -83,6 +84,19 @@ export function ChatPage() {
       <Paper elevation={0} sx={{ p: 3, border: "1px solid", borderColor: "divider" }}>
         <Stack spacing={2}>
           <Typography variant="h5">Assistant Chat</Typography>
+          <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
+            <Typography variant="body2">Step 5 of 5: Ask, then continue same conversation</Typography>
+            <Chip
+              size="small"
+              color={conversationId ? "success" : "default"}
+              label={conversationId ? "Conversation active" : "New conversation"}
+            />
+          </Stack>
+          {conversationId ? (
+            <Typography variant="caption" color="text.secondary">
+              conversationId: {conversationId}
+            </Typography>
+          ) : null}
           {!companyId || !workspaceId ? (
             <Alert severity="warning">Set company/workspace IDs on Dashboard first.</Alert>
           ) : null}

@@ -2,6 +2,7 @@ import { useState } from "react";
 import {
   Alert,
   Button,
+  Chip,
   LinearProgress,
   Paper,
   Stack,
@@ -13,6 +14,7 @@ import {
   TextField,
   Typography,
 } from "@mui/material";
+import { Link as RouterLink } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { AxiosError } from "axios";
 import { fetchKnowledgeAssets, uploadKnowledgeAsset } from "../services/api";
@@ -85,6 +87,10 @@ export function KnowledgePage() {
       <Paper elevation={0} sx={{ p: 3, border: "1px solid", borderColor: "divider" }}>
         <Stack spacing={2}>
           <Typography variant="h5">Knowledge Assets</Typography>
+          <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
+            <Typography variant="body2">Step 4 of 5: Upload file and wait for status</Typography>
+            <Chip size="small" label={(assetsQuery.data?.items?.length ?? 0) > 0 ? "Assets ready" : "No assets yet"} />
+          </Stack>
           {companyId && workspaceId ? null : (
             <Alert severity="warning">Set company/workspace IDs on Dashboard first.</Alert>
           )}
@@ -135,6 +141,9 @@ export function KnowledgePage() {
       <Paper elevation={0} sx={{ p: 3, border: "1px solid", borderColor: "divider", overflowX: "auto" }}>
         <Stack spacing={2}>
           <Typography variant="h6">Assets</Typography>
+          <Button variant="outlined" component={RouterLink} to="/chat">
+            Next: Open Assistant Chat
+          </Button>
           {assetsQuery.isLoading ? <LinearProgress /> : null}
           {assetsQuery.error ? (
             <Alert severity="error">Failed to load assets. Check auth and context headers.</Alert>
