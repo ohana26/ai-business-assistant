@@ -2,8 +2,14 @@ import {
   BadRequestException,
   ForbiddenException,
   Injectable,
+  NotFoundException,
 } from '@nestjs/common';
-import { MembershipStatus, MessageRole, UserStatus } from '@prisma/client';
+import {
+  MembershipStatus,
+  MessageRole,
+  Prisma,
+  UserStatus,
+} from '@prisma/client';
 import { PrismaService } from '../../database/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import type { CurrentUserContext } from '../auth/types/current-user-context.type';
@@ -394,6 +400,80 @@ export class AssistantsService {
     };
   }
 
+  async listMemories(params: {
+    userContext: CurrentUserContext;
+    companyId?: string;
+  }) {
+    const { companyId } = await this.assertCompanyAccess(
+      params.userContext,
+      params.companyId,
+    );
+
+    return this.memoryService.listUserMemories({
+      userId: params.userContext.userId,
+      companyId,
+    });
+  }
+
+  async deleteMemory(params: {
+    userContext: CurrentUserContext;
+    companyId?: string;
+    memoryId: string;
+  }) {
+    const { companyId } = await this.assertCompanyAccess(
+      params.userContext,
+      params.companyId,
+    );
+    const result = await this.memoryService.deleteUserMemory({
+      userId: params.userContext.userId,
+      companyId,
+      memoryId: params.memoryId,
+    });
+    if (!result.deleted) {
+      throw new NotFoundException('Memory was not found');
+    }
+
+    return result;
+  }
+
+  async listAssistantProfiles(params: {
+    userContext: CurrentUserContext;
+    companyId?: string;
+  }) {
+    const { companyId } = await this.assertCompanyAccess(
+      params.userContext,
+      params.companyId,
+    );
+    return this.memoryService.listAssistantProfiles({ companyId });
+  }
+
+  async updateAssistantProfile(params: {
+    userContext: CurrentUserContext;
+    companyId?: string;
+    profileId: string;
+    name?: string;
+    systemPrompt?: string;
+    behaviorConfig?: unknown;
+  }) {
+    const { companyId } = await this.assertCompanyAccess(
+      params.userContext,
+      params.companyId,
+    );
+    const updated = await this.memoryService.updateAssistantProfile({
+      profileId: params.profileId,
+      companyId,
+      actorUserId: params.userContext.userId,
+      name: params.name,
+      systemPrompt: params.systemPrompt,
+      behaviorConfig: params.behaviorConfig as
+        Prisma.InputJsonValue | undefined,
+    });
+    if (!updated) {
+      throw new NotFoundException('Assistant profile was not found');
+    }
+    return updated;
+  }
+
   private async assertWorkspaceAccess(
     userContext: CurrentUserContext,
     companyId: string | undefined,
@@ -453,5 +533,37 @@ export class AssistantsService {
     }
 
     return { companyId, workspaceId };
+  }
+
+  private async assertCompanyAccess(
+    userContext: CurrentUserContext,
+    companyId: string | undefined,
+  ) {
+    if (!companyId) {
+      throw new BadRequestException('x-company-id header is required');
+    }
+
+    const companyAccess = userContext.companies.find(
+      (company) => company.companyId === companyId,
+    );
+    if (!companyAccess) {
+      throw new ForbiddenException(
+        'User is not a member of the provided company',
+      );
+    }
+
+    const user = await this.prisma.user.findFirst({
+      where: {
+        id: userContext.userId,
+        status: UserStatus.ACTIVE,
+        deletedAt: null,
+      },
+      select: { id: true },
+    });
+    if (!user) {
+      throw new ForbiddenException('User is not active');
+    }
+
+    return { companyId };
   }
 }

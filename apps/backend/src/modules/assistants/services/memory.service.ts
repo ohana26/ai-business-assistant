@@ -134,6 +134,172 @@ export class MemoryService {
     });
   }
 
+  async listUserMemories(params: { userId: string; companyId: string }) {
+    const memories = await this.prisma.userMemory.findMany({
+      where: {
+        userId: params.userId,
+        companyId: params.companyId,
+      },
+      orderBy: [{ importance: 'desc' }, { createdAt: 'desc' }],
+      take: 100,
+      select: {
+        id: true,
+        type: true,
+        content: true,
+        importance: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+    });
+
+    await this.auditService.log({
+      companyId: params.companyId,
+      userId: params.userId,
+      action: 'memory.viewed',
+      resourceType: 'assistant.memory',
+      metadata: {
+        count: memories.length,
+        memoryIds: memories.map((memory) => memory.id),
+      },
+    });
+
+    return {
+      items: memories.map((memory) => ({
+        id: memory.id,
+        type: memory.type,
+        content: memory.content,
+        importance: memory.importance,
+        createdAt: memory.createdAt.toISOString(),
+        updatedAt: memory.updatedAt.toISOString(),
+      })),
+    };
+  }
+
+  async deleteUserMemory(params: {
+    userId: string;
+    companyId: string;
+    memoryId: string;
+  }) {
+    const memory = await this.prisma.userMemory.findFirst({
+      where: {
+        id: params.memoryId,
+        userId: params.userId,
+        companyId: params.companyId,
+      },
+      select: {
+        id: true,
+      },
+    });
+    if (!memory) {
+      return { deleted: false };
+    }
+
+    await this.prisma.userMemory.delete({
+      where: {
+        id: memory.id,
+      },
+    });
+
+    await this.auditService.log({
+      companyId: params.companyId,
+      userId: params.userId,
+      action: 'memory.deleted',
+      resourceType: 'assistant.memory',
+      resourceId: memory.id,
+    });
+
+    return { deleted: true, id: memory.id };
+  }
+
+  async listAssistantProfiles(params: { companyId: string }) {
+    const profiles = await this.prisma.assistantProfile.findMany({
+      where: {
+        companyId: params.companyId,
+      },
+      orderBy: { createdAt: 'asc' },
+      select: {
+        id: true,
+        name: true,
+        systemPrompt: true,
+        behaviorConfig: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+    });
+
+    return {
+      items: profiles.map((profile) => ({
+        id: profile.id,
+        name: profile.name,
+        systemPrompt: profile.systemPrompt,
+        behaviorConfig: profile.behaviorConfig,
+        createdAt: profile.createdAt.toISOString(),
+        updatedAt: profile.updatedAt.toISOString(),
+      })),
+    };
+  }
+
+  async updateAssistantProfile(params: {
+    profileId: string;
+    companyId: string;
+    actorUserId: string;
+    name?: string;
+    systemPrompt?: string;
+    behaviorConfig?: Prisma.InputJsonValue;
+  }) {
+    const profile = await this.prisma.assistantProfile.findFirst({
+      where: {
+        id: params.profileId,
+        companyId: params.companyId,
+      },
+      select: {
+        id: true,
+      },
+    });
+    if (!profile) {
+      return null;
+    }
+
+    const updated = await this.prisma.assistantProfile.update({
+      where: { id: profile.id },
+      data: {
+        name: params.name,
+        systemPrompt: params.systemPrompt,
+        behaviorConfig: params.behaviorConfig,
+      },
+      select: {
+        id: true,
+        name: true,
+        systemPrompt: true,
+        behaviorConfig: true,
+        updatedAt: true,
+      },
+    });
+
+    await this.auditService.log({
+      companyId: params.companyId,
+      userId: params.actorUserId,
+      action: 'profile.updated',
+      resourceType: 'assistant.profile',
+      resourceId: updated.id,
+      metadata: {
+        updatedFields: {
+          name: typeof params.name !== 'undefined',
+          systemPrompt: typeof params.systemPrompt !== 'undefined',
+          behaviorConfig: typeof params.behaviorConfig !== 'undefined',
+        },
+      },
+    });
+
+    return {
+      id: updated.id,
+      name: updated.name,
+      systemPrompt: updated.systemPrompt,
+      behaviorConfig: updated.behaviorConfig,
+      updatedAt: updated.updatedAt.toISOString(),
+    };
+  }
+
   private async retrieveRelevantMemories(params: {
     userId: string;
     companyId: string;
