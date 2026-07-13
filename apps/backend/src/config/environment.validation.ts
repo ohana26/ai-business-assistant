@@ -32,6 +32,10 @@ class EnvironmentVariables {
   @IsString()
   NODE_ENV?: string;
 
+  @IsOptional()
+  @IsString()
+  CORS_ORIGINS?: string;
+
   @IsString()
   @IsNotEmpty()
   JWT_ACCESS_SECRET!: string;
