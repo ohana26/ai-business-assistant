@@ -1,15 +1,17 @@
 import { useState } from "react";
-import { Alert, Box, Button, Paper, Stack, TextField, Typography } from "@mui/material";
+import { Alert, Box, Button, Paper, Stack, Tab, Tabs, TextField, Typography } from "@mui/material";
 import { useMutation } from "@tanstack/react-query";
 import { useLocation, useNavigate } from "react-router-dom";
 import { AxiosError } from "axios";
-import { login } from "../services/api";
+import { login, register } from "../services/api";
 import { useAuthStore } from "../store/authStore";
 
 export function LoginPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const setAccessToken = useAuthStore((state) => state.setAccessToken);
+  const [mode, setMode] = useState<"login" | "register">("login");
+  const [displayName, setDisplayName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
 
@@ -28,14 +30,34 @@ export function LoginPage() {
     },
   });
 
+  const registerMutation = useMutation({
+    mutationFn: register,
+    onSuccess: (data) => {
+      setAccessToken(data.accessToken);
+      navigate("/dashboard", { replace: true });
+    },
+  });
+
   const loginError =
     loginMutation.error instanceof AxiosError
       ? loginMutation.error.response?.data?.message || "Login failed. Check credentials."
       : null;
+  const registerError =
+    registerMutation.error instanceof AxiosError
+      ? registerMutation.error.response?.data?.message || "Registration failed."
+      : null;
 
   const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    loginMutation.mutate({ email, password });
+    if (mode === "login") {
+      loginMutation.mutate({ email, password });
+      return;
+    }
+    registerMutation.mutate({
+      email,
+      password,
+      displayName: displayName.trim() || undefined,
+    });
   };
 
   return (
@@ -64,12 +86,29 @@ export function LoginPage() {
               AI Business Assistant
             </Typography>
             <Typography variant="body2" color="text.secondary" sx={{ mt: 0.75 }}>
-              Internal admin console login
+              Step 1: Register (or login), then continue the RAG test cycle.
             </Typography>
           </Box>
+          <Tabs value={mode} onChange={(_e, value) => setMode(value)}>
+            <Tab label="Login" value="login" />
+            <Tab label="Register" value="register" />
+          </Tabs>
           <Box component="form" onSubmit={handleSubmit}>
             <Stack spacing={2}>
-              {loginError ? <Alert severity="error">{String(loginError)}</Alert> : null}
+              {mode === "login" && loginError ? (
+                <Alert severity="error">{String(loginError)}</Alert>
+              ) : null}
+              {mode === "register" && registerError ? (
+                <Alert severity="error">{String(registerError)}</Alert>
+              ) : null}
+              {mode === "register" ? (
+                <TextField
+                  label="Display Name (optional)"
+                  fullWidth
+                  value={displayName}
+                  onChange={(event) => setDisplayName(event.target.value)}
+                />
+              ) : null}
               <TextField
                 label="Email"
                 type="email"
@@ -85,14 +124,23 @@ export function LoginPage() {
                 value={password}
                 onChange={(event) => setPassword(event.target.value)}
                 required
+                helperText={
+                  mode === "register" ? "Use at least 8 characters for registration." : undefined
+                }
               />
               <Button
                 variant="contained"
                 size="large"
                 type="submit"
-                disabled={loginMutation.isPending}
+                disabled={loginMutation.isPending || registerMutation.isPending}
               >
-                {loginMutation.isPending ? "Signing in..." : "Sign In"}
+                {mode === "login"
+                  ? loginMutation.isPending
+                    ? "Signing in..."
+                    : "Sign In"
+                  : registerMutation.isPending
+                    ? "Creating account..."
+                    : "Create Account"}
               </Button>
             </Stack>
           </Box>

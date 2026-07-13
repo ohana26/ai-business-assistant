@@ -31,6 +31,12 @@ export type LoginRequest = {
   password: string;
 };
 
+export type RegisterRequest = {
+  email: string;
+  password: string;
+  displayName?: string;
+};
+
 export type LoginResponse = {
   accessToken: string;
   refreshToken?: string;
@@ -67,6 +73,11 @@ export type AssistantChatResponse = {
 
 export async function login(payload: LoginRequest): Promise<LoginResponse> {
   const response = await apiClient.post<LoginResponse>("/auth/login", payload);
+  return response.data;
+}
+
+export async function register(payload: RegisterRequest): Promise<LoginResponse> {
+  const response = await apiClient.post<LoginResponse>("/auth/register", payload);
   return response.data;
 }
 
