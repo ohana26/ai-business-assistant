@@ -5,11 +5,13 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { AxiosError } from "axios";
 import { login, register } from "../services/api";
 import { useAuthStore } from "../store/authStore";
+import { useWorkspaceStore } from "../store/workspaceStore";
 
 export function LoginPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const setAccessToken = useAuthStore((state) => state.setAccessToken);
+  const setContext = useWorkspaceStore((state) => state.setContext);
   const [mode, setMode] = useState<"login" | "register">("login");
   const [displayName, setDisplayName] = useState("");
   const [email, setEmail] = useState("");
@@ -34,6 +36,9 @@ export function LoginPage() {
     mutationFn: register,
     onSuccess: (data) => {
       setAccessToken(data.accessToken);
+      if (data.onboarding) {
+        setContext(data.onboarding);
+      }
       navigate("/dashboard", { replace: true });
     },
   });

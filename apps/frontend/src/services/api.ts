@@ -37,9 +37,14 @@ export type RegisterRequest = {
   displayName?: string;
 };
 
-export type LoginResponse = {
+export type AuthResponse = {
   accessToken: string;
   refreshToken?: string;
+  onboarding?: {
+    companyId: string;
+    workspaceId: string;
+    collectionId: string;
+  };
 };
 
 export type AssetItem = {
@@ -71,13 +76,13 @@ export type AssistantChatResponse = {
   sources?: AssistantSource[];
 };
 
-export async function login(payload: LoginRequest): Promise<LoginResponse> {
-  const response = await apiClient.post<LoginResponse>("/auth/login", payload);
+export async function login(payload: LoginRequest): Promise<AuthResponse> {
+  const response = await apiClient.post<AuthResponse>("/auth/login", payload);
   return response.data;
 }
 
-export async function register(payload: RegisterRequest): Promise<LoginResponse> {
-  const response = await apiClient.post<LoginResponse>("/auth/register", payload);
+export async function register(payload: RegisterRequest): Promise<AuthResponse> {
+  const response = await apiClient.post<AuthResponse>("/auth/register", payload);
   return response.data;
 }
 
