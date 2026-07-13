@@ -4,6 +4,7 @@ import {
   Box,
   Button,
   Chip,
+  CircularProgress,
   Divider,
   LinearProgress,
   List,
@@ -14,6 +15,8 @@ import {
   TextField,
   Typography,
 } from "@mui/material";
+import SendRoundedIcon from "@mui/icons-material/SendRounded";
+import AddRoundedIcon from "@mui/icons-material/AddRounded";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { AxiosError } from "axios";
 import {
@@ -58,6 +61,7 @@ export function ChatPage() {
   const [latestSources, setLatestSources] = useState<AssistantSource[]>([]);
   const [pendingUserMessage, setPendingUserMessage] = useState<string | null>(null);
   const messagesContainerRef = useRef<HTMLDivElement | null>(null);
+  const inputRef = useRef<HTMLTextAreaElement | null>(null);
 
   const conversationsQuery = useQuery({
     queryKey: conversationListQueryKey(companyId, workspaceId),
@@ -67,6 +71,15 @@ export function ChatPage() {
     refetchOnWindowFocus: true,
     refetchInterval: false,
   });
+  const availableConversationIds = useMemo(
+    () => new Set((conversationsQuery.data?.items ?? []).map((item) => item.id)),
+    [conversationsQuery.data?.items],
+  );
+  const canLoadSelectedConversation = Boolean(
+    selectedConversationId &&
+      (availableConversationIds.has(selectedConversationId) ||
+        conversationsQuery.isLoading),
+  );
 
   const messagesQuery = useQuery({
     queryKey: conversationMessagesQueryKey(
@@ -80,7 +93,13 @@ export function ChatPage() {
         workspaceId,
         conversationId: selectedConversationId as string,
       }),
-    enabled: Boolean(isAuthenticated && companyId && workspaceId && selectedConversationId),
+    enabled: Boolean(
+      isAuthenticated &&
+        companyId &&
+        workspaceId &&
+        selectedConversationId &&
+        canLoadSelectedConversation,
+    ),
     refetchOnMount: "always",
     refetchOnWindowFocus: true,
     refetchInterval: false,
@@ -137,6 +156,7 @@ export function ChatPage() {
     onMutate: async (variables) => {
       setPendingUserMessage(variables.message);
       setMessage("");
+      setLatestSources([]);
     },
     onSuccess: async (data) => {
       const nextConversationId =
@@ -176,6 +196,12 @@ export function ChatPage() {
     },
   });
 
+  useEffect(() => {
+    if (!chatMutation.isPending) {
+      inputRef.current?.focus();
+    }
+  }, [chatMutation.isPending]);
+
   const chatError =
     chatMutation.error instanceof AxiosError
       ? chatMutation.error.response?.data?.message || "Assistant chat failed."
@@ -207,51 +233,21 @@ export function ChatPage() {
   );
 
   return (
-    <Stack spacing={2}>
+    <Stack spacing={2} sx={{ height: "calc(100vh - 140px)", minHeight: 640 }}>
       <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
-        <Typography variant="h5">Assistant Chat</Typography>
+        <Typography variant="h5">{assistantProfile?.assistantName || "Assistant"}</Typography>
         <Chip
           size="small"
           color={selectedConversationId ? "success" : "default"}
           label={selectedConversationId ? "Conversation active" : "New conversation"}
         />
       </Stack>
-
-      <Paper elevation={0} sx={{ p: 2, border: "1px solid", borderColor: "divider" }}>
-        <Stack spacing={0.75}>
-          <Typography variant="subtitle2">What this system is</Typography>
-          <Typography variant="body2" color="text.secondary">
-            {assistantProfile?.assistantName || "Your assistant"} supports employees
-            with company answers grounded in uploaded business knowledge.
-          </Typography>
-          <Typography variant="subtitle2" sx={{ mt: 1 }}>
-            Assistant role
-          </Typography>
-          <Typography variant="body2" color="text.secondary">
-            {assistantProfile?.roleDescription ||
-              "General company knowledge and process assistant"}
-          </Typography>
-          <Typography variant="subtitle2" sx={{ mt: 1 }}>
-            Response style
-          </Typography>
-          <Typography variant="body2" color="text.secondary">
-            {assistantProfile?.answerStyle || "balanced"} responses. Sources are shown
-            when document chunks are retrieved.
-          </Typography>
-        </Stack>
-      </Paper>
       {!companyId || !workspaceId ? (
-        <Alert severity="warning">
-          Set company/workspace IDs on Dashboard first.
-        </Alert>
+        <Alert severity="warning">Select company/workspace first from top bar.</Alert>
       ) : null}
       {chatError ? <Alert severity="error">{String(chatError)}</Alert> : null}
 
-      <Stack
-        direction={{ xs: "column", md: "row" }}
-        spacing={2}
-        sx={{ minHeight: "70vh" }}
-      >
+      <Stack direction={{ xs: "column", md: "row" }} spacing={2} sx={{ minHeight: 0, flex: 1 }}>
         <Paper
           elevation={0}
           sx={{
@@ -260,10 +256,16 @@ export function ChatPage() {
             borderColor: "divider",
             display: "flex",
             flexDirection: "column",
+            minHeight: 0,
           }}
         >
           <Box sx={{ p: 2, borderBottom: "1px solid", borderColor: "divider" }}>
-            <Button variant="outlined" fullWidth onClick={startNewConversation}>
+            <Button
+              variant="outlined"
+              startIcon={<AddRoundedIcon />}
+              fullWidth
+              onClick={startNewConversation}
+            >
               New conversation
             </Button>
           </Box>
@@ -288,7 +290,15 @@ export function ChatPage() {
                     conversation.lastMessage?.content?.slice(0, 50) ||
                     "New conversation"
                   }
-                  secondary={new Date(conversation.updatedAt).toLocaleString()}
+                  secondary={
+                    <Typography
+                      variant="caption"
+                      color="text.secondary"
+                      sx={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}
+                    >
+                      {new Date(conversation.updatedAt).toLocaleString()}
+                    </Typography>
+                  }
                 />
               </ListItemButton>
             ))}
@@ -310,6 +320,7 @@ export function ChatPage() {
             borderColor: "divider",
             display: "flex",
             flexDirection: "column",
+            minHeight: 0,
           }}
         >
           <Box
@@ -324,20 +335,27 @@ export function ChatPage() {
             }}
           >
             {messagesQuery.isLoading ? <LinearProgress /> : null}
-            {selectedConversationMessages.length === 0 ? (
+            {selectedConversationMessages.length === 0 && !pendingUserMessage ? (
               <Stack spacing={1}>
                 <Typography variant="body2" color="text.secondary">
-                  Start with a regular question like:
+                  Start a conversation:
                 </Typography>
-                <Typography variant="body2" color="text.secondary">
-                  • “Summarize our refund policy”
-                </Typography>
-                <Typography variant="body2" color="text.secondary">
-                  • “What are onboarding steps for new employees?”
-                </Typography>
-                <Typography variant="body2" color="text.secondary">
-                  • “Create a checklist from the uploaded SOP”
-                </Typography>
+                <Stack spacing={0.75}>
+                  {[
+                    "Summarize our refund policy",
+                    "What are onboarding steps for new employees?",
+                    "Create a checklist from the uploaded SOP",
+                  ].map((example) => (
+                    <Button
+                      key={example}
+                      variant="text"
+                      sx={{ justifyContent: "flex-start" }}
+                      onClick={() => setMessage(example)}
+                    >
+                      {example}
+                    </Button>
+                  ))}
+                </Stack>
               </Stack>
             ) : (
               selectedConversationMessages.map((item) => {
@@ -389,55 +407,62 @@ export function ChatPage() {
               <Box
                 sx={{
                   alignSelf: "flex-start",
-                  maxWidth: "85%",
+                  maxWidth: 220,
                   px: 1.5,
-                  py: 1.2,
+                  py: 1,
                   borderRadius: 2,
                   bgcolor: "grey.100",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 1,
                 }}
               >
-                <Typography variant="body2" color="text.secondary">
-                  Assistant is thinking...
-                </Typography>
+                <CircularProgress size={14} />
+                <Typography variant="body2" color="text.secondary">Thinking…</Typography>
               </Box>
             ) : null}
           </Box>
 
           <Divider />
-          <Box sx={{ p: 2 }}>
+          <Box sx={{ p: 2, borderTop: "1px solid", borderColor: "divider" }}>
             <Stack spacing={1.5}>
-              <TextField
-                label="Ask your assistant..."
-                multiline
-                minRows={2}
-                value={message}
-                onChange={(event) => setMessage(event.target.value)}
-                onKeyDown={(event) => {
-                  if (event.key === "Enter" && !event.shiftKey) {
-                    event.preventDefault();
-                    sendMessage();
+              <Stack direction="row" spacing={1} sx={{ alignItems: "flex-end" }}>
+                <TextField
+                  label="Message assistant..."
+                  multiline
+                  minRows={1}
+                  maxRows={6}
+                  value={message}
+                  inputRef={inputRef}
+                  onChange={(event) => setMessage(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" && !event.shiftKey) {
+                      event.preventDefault();
+                      sendMessage();
+                    }
+                  }}
+                  fullWidth
+                />
+                <Button
+                  variant="contained"
+                  onClick={sendMessage}
+                  disabled={
+                    !message.trim() ||
+                    !companyId ||
+                    !workspaceId ||
+                    chatMutation.isPending
                   }
-                }}
-                fullWidth
-              />
-              <Button
-                variant="contained"
-                onClick={sendMessage}
-                disabled={
-                  !message.trim() ||
-                  !companyId ||
-                  !workspaceId ||
-                  chatMutation.isPending
-                }
-              >
-                {chatMutation.isPending ? "Sending..." : "Send"}
-              </Button>
+                  sx={{ minWidth: 52, height: 56 }}
+                >
+                  <SendRoundedIcon fontSize="small" />
+                </Button>
+              </Stack>
               {latestSources.length > 0 ? (
                 <Box>
                   <Typography variant="caption" color="text.secondary">
-                    Sources from latest answer:
+                    Sources:
                   </Typography>
-                  <Stack spacing={0.5} sx={{ mt: 0.5 }}>
+                  <Stack spacing={0.5} sx={{ mt: 0.5, maxHeight: 120, overflowY: "auto" }}>
                     {latestSources.map((source) => (
                       <Typography
                         key={`${source.chunkId}-${source.assetId}`}
