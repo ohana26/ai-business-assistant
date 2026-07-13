@@ -59,6 +59,7 @@ export class AssistantsController {
       workspaceId,
       message: body.message,
       conversationId: body.conversationId,
+      debug: body.debug,
     });
   }
 

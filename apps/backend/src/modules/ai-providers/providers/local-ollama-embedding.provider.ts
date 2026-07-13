@@ -7,6 +7,7 @@ export class LocalOllamaEmbeddingProvider implements EmbeddingProvider {
   private readonly logger = new Logger(LocalOllamaEmbeddingProvider.name);
   private readonly baseUrl: string;
   private readonly model: string;
+  private readonly keepAlive: string;
 
   constructor(private readonly configService: ConfigService) {
     this.baseUrl = this.configService.get<string>(
@@ -17,6 +18,10 @@ export class LocalOllamaEmbeddingProvider implements EmbeddingProvider {
       'app.ollamaEmbedModel',
       'nomic-embed-text',
     );
+    this.keepAlive = this.configService.get<string>(
+      'app.ollamaKeepAlive',
+      '5m',
+    );
   }
 
   async createEmbedding(input: string): Promise<number[]> {
@@ -24,6 +29,7 @@ export class LocalOllamaEmbeddingProvider implements EmbeddingProvider {
       model: this.model,
       prompt: input,
       input,
+      keep_alive: this.keepAlive,
     });
     const legacyResponse = await fetch(`${this.baseUrl}/api/embeddings`, {
       method: 'POST',

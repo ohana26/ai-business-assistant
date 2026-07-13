@@ -2,6 +2,16 @@ export type RetrievedChunk = {
   chunkId: string;
   chunkContent: string;
   chunkIndex: number;
+  chunkMetadata?: {
+    pageNumber?: number;
+    section?: string;
+    document?: {
+      assetId: string;
+      filename: string;
+      title: string;
+      contentType?: string;
+    };
+  };
   assetId: string;
   assetTitle: string;
   assetFilename: string;
