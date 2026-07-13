@@ -13,19 +13,15 @@ import {
 import { PrismaService } from '../../database/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import type { CurrentUserContext } from '../auth/types/current-user-context.type';
-import { AiProvidersService } from '../ai-providers/ai-providers.service';
-import { RetrievalService } from '../knowledge/services/retrieval.service';
-import { PromptBuilderService } from './services/prompt-builder.service';
 import { MemoryService } from './services/memory.service';
 import { ConversationContextService } from './services/conversation-context.service';
+import { AssistantBrainService } from '../assistant-brain/assistant-brain.service';
 
 @Injectable()
 export class AssistantsService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly retrievalService: RetrievalService,
-    private readonly promptBuilderService: PromptBuilderService,
-    private readonly aiProvidersService: AiProvidersService,
+    private readonly assistantBrainService: AssistantBrainService,
     private readonly auditService: AuditService,
     private readonly memoryService: MemoryService,
     private readonly conversationContextService: ConversationContextService,
@@ -232,28 +228,10 @@ export class AssistantsService {
     });
 
     const startedAt = Date.now();
-    const retrievalStartedAt = Date.now();
-    let retrievedChunks = [] as Awaited<
-      ReturnType<RetrievalService['retrieveRelevantChunks']>
-    >;
-    let retrievalError: string | null = null;
-    try {
-      retrievedChunks = await this.retrievalService.retrieveRelevantChunks(
-        companyId,
-        workspaceId,
-        params.message,
-      );
-    } catch (error) {
-      retrievalError =
-        error instanceof Error ? error.message : 'Unknown retrieval error';
-    }
-    const retrievalLatency = Date.now() - retrievalStartedAt;
-
-    const prompt = this.promptBuilderService.buildPrompt({
+    const brainResult = await this.assistantBrainService.orchestrate({
       companyId,
       workspaceId,
       userMessage: params.message,
-      chunks: retrievedChunks,
       conversationHistory: conversationContext.recentMessages.map(
         (message) => ({
           role: message.role,
@@ -269,28 +247,10 @@ export class AssistantsService {
       recentMessages: conversationContext.recentMessages,
       userMemories: memoryContext.memories,
       assistantProfile: memoryContext.assistantProfile,
+      userId: params.userContext.userId,
+      conversationId: conversation.id,
     });
-    const promptCharacterCount = prompt.length;
-    const promptEstimatedTokens = Math.ceil(promptCharacterCount / 4);
-
-    const chatProvider = this.aiProvidersService.getChatProvider();
-    const generationStartedAt = Date.now();
-    const answer = await chatProvider.generateResponse(prompt);
-    const generationLatency = Date.now() - generationStartedAt;
     const latency = Date.now() - startedAt;
-    const retrievalSettings = this.retrievalService.getSettings();
-    const documentsUsed = Array.from(
-      new Map(
-        retrievedChunks.map((chunk) => [
-          chunk.assetId,
-          {
-            assetId: chunk.assetId,
-            filename: chunk.assetFilename,
-            title: chunk.assetTitle,
-          },
-        ]),
-      ).values(),
-    );
 
     const assistantMessage = await this.prisma.message.create({
       data: {
@@ -299,7 +259,7 @@ export class AssistantsService {
         workspaceId,
         userId: params.userContext.userId,
         role: MessageRole.ASSISTANT,
-        content: answer,
+        content: brainResult.answer,
       },
       select: { id: true, role: true },
     });
@@ -335,20 +295,42 @@ export class AssistantsService {
         userId: params.userContext.userId,
         companyId,
         workspaceId,
-        model: chatProvider.getModelName(),
+        intent: brainResult.intent,
+        model: brainResult.modelName,
         latency,
-        retrievalLatency,
-        generationLatency,
-        promptCharacterCount,
-        promptEstimatedTokens,
-        retrievalSettings,
-        documentsUsed,
+        retrievalLatency: brainResult.retrievalLatency,
+        generationLatency: brainResult.generationLatency,
+        promptCharacterCount: brainResult.promptCharacterCount,
+        promptEstimatedTokens: brainResult.promptEstimatedTokens,
+        retrievalSettings: brainResult.retrievalSettings,
+        documentsUsed: brainResult.documentsUsed,
         conversationSummary: conversationContext.summary,
         conversationFactCount: conversationContext.importantFacts.length,
         memoryCount: memoryContext.memories.length,
         assistantProfileId: memoryContext.assistantProfile.id,
-        retrievalError,
-        retrievedChunks: retrievedChunks.map((chunk) => ({
+        retrievalError: brainResult.retrievalError,
+        toolPlan: brainResult.toolPlan
+          ? {
+              toolName: brainResult.toolPlan.toolName,
+              reason: brainResult.toolPlan.reason,
+              confidence: brainResult.toolPlan.confidence,
+              parameters: brainResult.toolPlan.parameters,
+              missingInformation: brainResult.toolPlan.missingInformation,
+              requiresUserConfirmation:
+                brainResult.toolPlan.requiresUserConfirmation,
+            }
+          : null,
+        toolExecution: brainResult.toolExecution
+          ? {
+              executionId: brainResult.toolExecution.executionId,
+              success: brainResult.toolExecution.success,
+              toolName: brainResult.toolExecution.toolName,
+              message: brainResult.toolExecution.message,
+              errorCode: brainResult.toolExecution.errorCode ?? null,
+              data: brainResult.toolExecution.data ?? null,
+            }
+          : null,
+        retrievedChunks: brainResult.retrievedChunks.map((chunk) => ({
           chunkId: chunk.chunkId,
           assetId: chunk.assetId,
           score: chunk.similarityScore,
@@ -360,16 +342,11 @@ export class AssistantsService {
 
     const response = {
       conversationId: conversation.id,
-      answer,
-      sources: retrievedChunks.map((chunk) => ({
-        chunkId: chunk.chunkId,
-        assetId: chunk.assetId,
-        filename: chunk.assetFilename,
-        title: chunk.assetTitle,
-        similarityScore: chunk.similarityScore,
-        pageNumber: chunk.chunkMetadata?.pageNumber,
-        section: chunk.chunkMetadata?.section,
-      })),
+      intent: brainResult.intent,
+      answer: brainResult.answer,
+      toolPlan: brainResult.toolPlan,
+      toolExecution: brainResult.toolExecution,
+      sources: brainResult.sources,
     };
 
     await this.memoryService.captureMemoryFromUserMessage({
@@ -384,7 +361,10 @@ export class AssistantsService {
     return {
       ...response,
       debug: {
-        retrievalSettings,
+        retrievalSettings: brainResult.retrievalSettings,
+        intent: brainResult.intent,
+        toolPlan: brainResult.toolPlan,
+        toolExecution: brainResult.toolExecution,
         memory: {
           count: memoryContext.memories.length,
           assistantProfileId: memoryContext.assistantProfile.id,
@@ -397,16 +377,16 @@ export class AssistantsService {
           recentMessages: conversationContext.recentMessages,
         },
         prompt: {
-          characterCount: promptCharacterCount,
-          estimatedTokens: promptEstimatedTokens,
+          characterCount: brainResult.promptCharacterCount,
+          estimatedTokens: brainResult.promptEstimatedTokens,
         },
         latency: {
           totalMs: latency,
-          retrievalMs: retrievalLatency,
-          generationMs: generationLatency,
+          retrievalMs: brainResult.retrievalLatency,
+          generationMs: brainResult.generationLatency,
         },
-        documentsUsed,
-        retrievedChunks: retrievedChunks.map((chunk) => ({
+        documentsUsed: brainResult.documentsUsed,
+        retrievedChunks: brainResult.retrievedChunks.map((chunk) => ({
           chunkId: chunk.chunkId,
           chunkIndex: chunk.chunkIndex,
           assetId: chunk.assetId,
@@ -416,7 +396,7 @@ export class AssistantsService {
           metadata: chunk.chunkMetadata ?? null,
           content: chunk.chunkContent,
         })),
-        retrievalError,
+        retrievalError: brainResult.retrievalError,
       },
     };
   }

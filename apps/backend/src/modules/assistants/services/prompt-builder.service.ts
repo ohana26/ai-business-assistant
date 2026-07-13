@@ -79,6 +79,8 @@ export class PromptBuilderService {
       '4) Always include source citations at the end using the exact asset filename when context exists.',
       '5) Keep answers concise, factual, and auditable.',
       '6) Use conversation history only for user intent continuity; do not treat it as authoritative company knowledge unless it appears in retrieved chunks.',
+      '7) Never claim that an external action was executed (for example: meeting created, email sent, API called, database changed) unless the platform explicitly provides a successful tool execution result.',
+      '8) If a user request requires an action, provide decision support only and wait for the platform tool planner/execution layer. Do not pretend the action already happened.',
       `Company: ${params.companyId}`,
       `Workspace: ${params.workspaceId}`,
       `Assistant behavior config: ${profileBehaviorText}`,
