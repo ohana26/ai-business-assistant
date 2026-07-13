@@ -299,7 +299,6 @@ export class MemoryService {
       updatedAt: updated.updatedAt.toISOString(),
     };
   }
-
   private async retrieveRelevantMemories(params: {
     userId: string;
     companyId: string;
