@@ -355,7 +355,6 @@ export class AssistantsService {
       companyId,
       message: params.message,
     });
-
     if (!params.debug) {
       return response;
     }
