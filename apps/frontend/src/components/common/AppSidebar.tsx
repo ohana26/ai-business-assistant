@@ -1,15 +1,18 @@
 import DashboardOutlinedIcon from "@mui/icons-material/DashboardOutlined";
 import HubOutlinedIcon from "@mui/icons-material/HubOutlined";
 import ChatBubbleOutlineOutlinedIcon from "@mui/icons-material/ChatBubbleOutlineOutlined";
-import AutoFixHighOutlinedIcon from "@mui/icons-material/AutoFixHighOutlined";
+import MemoryOutlinedIcon from "@mui/icons-material/MemoryOutlined";
+import AdminPanelSettingsOutlinedIcon from "@mui/icons-material/AdminPanelSettingsOutlined";
 import { Box, List, ListItemButton, ListItemIcon, ListItemText, Typography } from "@mui/material";
 import { Link as RouterLink, useLocation } from "react-router-dom";
 
 const navigationItems = [
-  { label: "Onboarding", path: "/onboarding", icon: <AutoFixHighOutlinedIcon fontSize="small" /> },
+  { label: "Assistant", path: "/assistant", icon: <ChatBubbleOutlineOutlinedIcon fontSize="small" /> },
   { label: "Dashboard", path: "/dashboard", icon: <DashboardOutlinedIcon fontSize="small" /> },
   { label: "Knowledge", path: "/knowledge", icon: <HubOutlinedIcon fontSize="small" /> },
-  { label: "Chat", path: "/chat", icon: <ChatBubbleOutlineOutlinedIcon fontSize="small" /> },
+  { label: "Memory", path: "/memory", icon: <MemoryOutlinedIcon fontSize="small" /> },
+  { label: "Admin Users", path: "/admin/users", icon: <AdminPanelSettingsOutlinedIcon fontSize="small" /> },
+  { label: "Admin Assistant", path: "/admin/assistant", icon: <AdminPanelSettingsOutlinedIcon fontSize="small" /> },
 ];
 
 export function AppSidebar() {

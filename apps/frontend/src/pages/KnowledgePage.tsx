@@ -17,7 +17,7 @@ import {
 import { Link as RouterLink } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { AxiosError } from "axios";
-import { fetchKnowledgeAssets, uploadKnowledgeAsset } from "../services/api";
+import { fetchKnowledgeAssets, uploadKnowledgeAsset } from "../api";
 import { useWorkspaceStore } from "../store/workspaceStore";
 
 function formatBytes(bytesAsString: string): string {
@@ -137,7 +137,7 @@ export function KnowledgePage() {
       <Paper elevation={0} sx={{ p: 3, border: "1px solid", borderColor: "divider", overflowX: "auto" }}>
         <Stack spacing={2}>
           <Typography variant="h6">Assets</Typography>
-          <Button variant="outlined" component={RouterLink} to="/chat">
+          <Button variant="outlined" component={RouterLink} to="/assistant">
             Next: Open Assistant Chat
           </Button>
           {assetsQuery.isLoading ? <LinearProgress /> : null}

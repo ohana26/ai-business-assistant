@@ -1,18 +1,15 @@
 import LogoutOutlinedIcon from "@mui/icons-material/LogoutOutlined";
 import { Box, Button, Chip, Typography } from "@mui/material";
 import { useNavigate } from "react-router-dom";
-import { useAuthStore } from "../../store/authStore";
+import { useAuthSession } from "../../auth/useAuthSession";
 import { useWorkspaceStore } from "../../store/workspaceStore";
-import { useOnboardingStore } from "../../store/onboardingStore";
+import { WorkspaceSelector } from "./WorkspaceSelector";
 
 export function TopNavigation() {
   const navigate = useNavigate();
-  const clearAuth = useAuthStore((state) => state.clearAuth);
+  const { clearAuth, user } = useAuthSession();
   const companyId = useWorkspaceStore((state) => state.companyId);
   const workspaceId = useWorkspaceStore((state) => state.workspaceId);
-  const assistantProfile = useOnboardingStore((state) =>
-    state.getAssistantProfile(companyId, workspaceId),
-  );
 
   const handleLogout = () => {
     clearAuth();
@@ -39,18 +36,18 @@ export function TopNavigation() {
           AI Business Assistant Console
         </Typography>
         <Box sx={{ display: "flex", gap: 1, mt: 0.5, flexWrap: "wrap" }}>
+          <Chip size="small" label={`User: ${user?.email || "Unknown"}`} />
           <Chip size="small" label={`Company: ${companyId || "Not set"}`} />
           <Chip size="small" label={`Workspace: ${workspaceId || "Not set"}`} />
-          <Chip
-            size="small"
-            label={`Assistant: ${assistantProfile?.assistantName || "Not configured"}`}
-          />
         </Box>
       </Box>
 
-      <Button size="small" color="inherit" startIcon={<LogoutOutlinedIcon />} onClick={handleLogout}>
-        Logout
-      </Button>
+      <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
+        <WorkspaceSelector />
+        <Button size="small" color="inherit" startIcon={<LogoutOutlinedIcon />} onClick={handleLogout}>
+          Logout
+        </Button>
+      </Box>
     </Box>
   );
 }

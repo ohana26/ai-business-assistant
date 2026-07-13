@@ -21,7 +21,7 @@ import {
   fetchConversationMessages,
   sendAssistantChat,
   type AssistantSource,
-} from "../services/api";
+} from "../api";
 import { useWorkspaceStore } from "../store/workspaceStore";
 import { useOnboardingStore } from "../store/onboardingStore";
 
