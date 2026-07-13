@@ -21,6 +21,112 @@ export class AssistantsService {
     private readonly auditService: AuditService,
   ) {}
 
+  async listConversations(params: {
+    userContext: CurrentUserContext;
+    companyId?: string;
+    workspaceId?: string;
+  }) {
+    const { companyId, workspaceId } = await this.assertWorkspaceAccess(
+      params.userContext,
+      params.companyId,
+      params.workspaceId,
+    );
+
+    const conversations = await this.prisma.conversation.findMany({
+      where: {
+        companyId,
+        workspaceId,
+        userId: params.userContext.userId,
+        deletedAt: null,
+      },
+      orderBy: { updatedAt: 'desc' },
+      include: {
+        messages: {
+          where: { deletedAt: null },
+          orderBy: { createdAt: 'desc' },
+          take: 1,
+          select: {
+            id: true,
+            role: true,
+            content: true,
+            createdAt: true,
+          },
+        },
+      },
+    });
+
+    return {
+      items: conversations.map((conversation) => ({
+        id: conversation.id,
+        createdAt: conversation.createdAt.toISOString(),
+        updatedAt: conversation.updatedAt.toISOString(),
+        lastMessage: conversation.messages[0]
+          ? {
+              id: conversation.messages[0].id,
+              role: conversation.messages[0].role,
+              content: conversation.messages[0].content,
+              createdAt: conversation.messages[0].createdAt.toISOString(),
+            }
+          : null,
+      })),
+    };
+  }
+
+  async listConversationMessages(params: {
+    userContext: CurrentUserContext;
+    companyId?: string;
+    workspaceId?: string;
+    conversationId: string;
+  }) {
+    const { companyId, workspaceId } = await this.assertWorkspaceAccess(
+      params.userContext,
+      params.companyId,
+      params.workspaceId,
+    );
+
+    const conversation = await this.prisma.conversation.findFirst({
+      where: {
+        id: params.conversationId,
+        companyId,
+        workspaceId,
+        userId: params.userContext.userId,
+        deletedAt: null,
+      },
+      select: { id: true },
+    });
+    if (!conversation) {
+      throw new ForbiddenException(
+        'Conversation is not accessible in the requested workspace',
+      );
+    }
+
+    const messages = await this.prisma.message.findMany({
+      where: {
+        conversationId: params.conversationId,
+        companyId,
+        workspaceId,
+        deletedAt: null,
+      },
+      orderBy: { createdAt: 'asc' },
+      select: {
+        id: true,
+        role: true,
+        content: true,
+        createdAt: true,
+      },
+    });
+
+    return {
+      conversationId: params.conversationId,
+      items: messages.map((message) => ({
+        id: message.id,
+        role: message.role,
+        content: message.content,
+        createdAt: message.createdAt.toISOString(),
+      })),
+    };
+  }
+
   async chat(params: {
     userContext: CurrentUserContext;
     companyId?: string;
@@ -28,64 +134,18 @@ export class AssistantsService {
     message: string;
     conversationId?: string;
   }) {
-    if (!params.companyId) {
-      throw new BadRequestException('x-company-id header is required');
-    }
-    if (!params.workspaceId) {
-      throw new BadRequestException('x-workspace-id header is required');
-    }
-
-    const companyAccess = params.userContext.companies.find(
-      (company) => company.companyId === params.companyId,
+    const { companyId, workspaceId } = await this.assertWorkspaceAccess(
+      params.userContext,
+      params.companyId,
+      params.workspaceId,
     );
-    if (!companyAccess) {
-      throw new ForbiddenException(
-        'User is not a member of the provided company',
-      );
-    }
-
-    const [user, workspaceMembership] = await Promise.all([
-      this.prisma.user.findFirst({
-        where: {
-          id: params.userContext.userId,
-          status: UserStatus.ACTIVE,
-          deletedAt: null,
-        },
-        select: { id: true },
-      }),
-      this.prisma.workspaceMembership.findFirst({
-        where: {
-          membershipId: companyAccess.membershipId,
-          workspaceId: params.workspaceId,
-          deletedAt: null,
-          membership: {
-            status: MembershipStatus.ACTIVE,
-            deletedAt: null,
-          },
-          workspace: {
-            companyId: params.companyId,
-            status: 'ACTIVE',
-            deletedAt: null,
-          },
-        },
-        select: { id: true },
-      }),
-    ]);
-    if (!user) {
-      throw new ForbiddenException('User is not active');
-    }
-    if (!workspaceMembership) {
-      throw new ForbiddenException(
-        'User does not have active access to the requested workspace',
-      );
-    }
 
     const conversation = params.conversationId
       ? await this.prisma.conversation.findFirst({
           where: {
             id: params.conversationId,
-            companyId: params.companyId,
-            workspaceId: params.workspaceId,
+            companyId,
+            workspaceId,
             userId: params.userContext.userId,
             deletedAt: null,
           },
@@ -93,8 +153,8 @@ export class AssistantsService {
         })
       : await this.prisma.conversation.create({
           data: {
-            companyId: params.companyId,
-            workspaceId: params.workspaceId,
+            companyId,
+            workspaceId,
             userId: params.userContext.userId,
           },
           select: { id: true },
@@ -106,13 +166,13 @@ export class AssistantsService {
     }
     if (!params.conversationId) {
       await this.auditService.log({
-        companyId: params.companyId,
+        companyId,
         userId: params.userContext.userId,
         action: 'assistant.conversation.created',
         resourceType: 'assistant.conversation',
         resourceId: conversation.id,
         metadata: {
-          workspaceId: params.workspaceId,
+          workspaceId,
         },
       });
     }
@@ -120,8 +180,8 @@ export class AssistantsService {
     const userMessage = await this.prisma.message.create({
       data: {
         conversationId: conversation.id,
-        companyId: params.companyId,
-        workspaceId: params.workspaceId,
+        companyId,
+        workspaceId,
         userId: params.userContext.userId,
         role: MessageRole.USER,
         content: params.message,
@@ -129,26 +189,26 @@ export class AssistantsService {
       select: { id: true, role: true },
     });
     await this.auditService.log({
-      companyId: params.companyId,
+      companyId,
       userId: params.userContext.userId,
       action: 'assistant.message.created',
       resourceType: 'assistant.message',
       resourceId: userMessage.id,
       metadata: {
-        workspaceId: params.workspaceId,
+        workspaceId,
         conversationId: conversation.id,
         role: userMessage.role,
       },
     });
     const startedAt = Date.now();
     const retrievedChunks = await this.retrievalService.retrieveRelevantChunks(
-      params.companyId,
-      params.workspaceId,
+      companyId,
+      workspaceId,
       params.message,
     );
     const prompt = this.promptBuilderService.buildPrompt({
-      companyId: params.companyId,
-      workspaceId: params.workspaceId,
+      companyId,
+      workspaceId,
       userMessage: params.message,
       chunks: retrievedChunks,
     });
@@ -159,8 +219,8 @@ export class AssistantsService {
     const assistantMessage = await this.prisma.message.create({
       data: {
         conversationId: conversation.id,
-        companyId: params.companyId,
-        workspaceId: params.workspaceId,
+        companyId,
+        workspaceId,
         userId: params.userContext.userId,
         role: MessageRole.ASSISTANT,
         content: answer,
@@ -168,26 +228,32 @@ export class AssistantsService {
       select: { id: true, role: true },
     });
     await this.auditService.log({
-      companyId: params.companyId,
+      companyId,
       userId: params.userContext.userId,
       action: 'assistant.message.created',
       resourceType: 'assistant.message',
       resourceId: assistantMessage.id,
       metadata: {
-        workspaceId: params.workspaceId,
+        workspaceId,
         conversationId: conversation.id,
         role: assistantMessage.role,
       },
     });
+
+    await this.prisma.conversation.update({
+      where: { id: conversation.id },
+      data: { updatedAt: new Date() },
+    });
+
     await this.auditService.log({
-      companyId: params.companyId,
+      companyId,
       userId: params.userContext.userId,
       action: 'assistant.chat',
       resourceType: 'assistant.chat',
       metadata: {
         userId: params.userContext.userId,
-        companyId: params.companyId,
-        workspaceId: params.workspaceId,
+        companyId,
+        workspaceId,
         model: chatProvider.getModelName(),
         latency,
         retrievedChunks: retrievedChunks.map((chunk) => ({
@@ -209,5 +275,66 @@ export class AssistantsService {
         similarityScore: chunk.similarityScore,
       })),
     };
+  }
+
+  private async assertWorkspaceAccess(
+    userContext: CurrentUserContext,
+    companyId: string | undefined,
+    workspaceId: string | undefined,
+  ) {
+    if (!companyId) {
+      throw new BadRequestException('x-company-id header is required');
+    }
+    if (!workspaceId) {
+      throw new BadRequestException('x-workspace-id header is required');
+    }
+
+    const companyAccess = userContext.companies.find(
+      (company) => company.companyId === companyId,
+    );
+    if (!companyAccess) {
+      throw new ForbiddenException(
+        'User is not a member of the provided company',
+      );
+    }
+
+    const [user, workspaceMembership] = await Promise.all([
+      this.prisma.user.findFirst({
+        where: {
+          id: userContext.userId,
+          status: UserStatus.ACTIVE,
+          deletedAt: null,
+        },
+        select: { id: true },
+      }),
+      this.prisma.workspaceMembership.findFirst({
+        where: {
+          membershipId: companyAccess.membershipId,
+          workspaceId,
+          deletedAt: null,
+          membership: {
+            status: MembershipStatus.ACTIVE,
+            deletedAt: null,
+          },
+          workspace: {
+            companyId,
+            status: 'ACTIVE',
+            deletedAt: null,
+          },
+        },
+        select: { id: true },
+      }),
+    ]);
+
+    if (!user) {
+      throw new ForbiddenException('User is not active');
+    }
+    if (!workspaceMembership) {
+      throw new ForbiddenException(
+        'User does not have active access to the requested workspace',
+      );
+    }
+
+    return { companyId, workspaceId };
   }
 }

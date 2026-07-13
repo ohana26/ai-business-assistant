@@ -1,56 +1,123 @@
-import { useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Alert,
+  Box,
   Button,
   Chip,
+  Divider,
+  LinearProgress,
+  List,
+  ListItemButton,
+  ListItemText,
   Paper,
   Stack,
   TextField,
   Typography,
-  List,
-  ListItem,
-  Divider,
 } from "@mui/material";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { AxiosError } from "axios";
-import { sendAssistantChat, type AssistantSource } from "../services/api";
+import {
+  fetchAssistantConversations,
+  fetchConversationMessages,
+  sendAssistantChat,
+  type AssistantSource,
+} from "../services/api";
 import { useWorkspaceStore } from "../store/workspaceStore";
 
 const CONVERSATION_STORAGE_KEY = "ai-assistant-conversation-id";
 
-type ChatRecord = {
-  id: string;
-  question: string;
-  answer: string;
-  sources: AssistantSource[];
-};
-
 export function ChatPage() {
+  const queryClient = useQueryClient();
   const companyId = useWorkspaceStore((state) => state.companyId);
   const workspaceId = useWorkspaceStore((state) => state.workspaceId);
   const [message, setMessage] = useState("");
-  const [records, setRecords] = useState<ChatRecord[]>([]);
-  const [conversationId, setConversationId] = useState<string | undefined>(
-    sessionStorage.getItem(CONVERSATION_STORAGE_KEY) ?? undefined,
-  );
+  const [selectedConversationId, setSelectedConversationId] = useState<
+    string | undefined
+  >(sessionStorage.getItem(CONVERSATION_STORAGE_KEY) ?? undefined);
+  const [latestSources, setLatestSources] = useState<AssistantSource[]>([]);
+  const messagesContainerRef = useRef<HTMLDivElement | null>(null);
+
+  const conversationsQuery = useQuery({
+    queryKey: ["assistant-conversations", companyId, workspaceId],
+    queryFn: () => fetchAssistantConversations({ companyId, workspaceId }),
+    enabled: Boolean(companyId && workspaceId),
+  });
+
+  const messagesQuery = useQuery({
+    queryKey: [
+      "assistant-conversation-messages",
+      companyId,
+      workspaceId,
+      selectedConversationId,
+    ],
+    queryFn: () =>
+      fetchConversationMessages({
+        companyId,
+        workspaceId,
+        conversationId: selectedConversationId as string,
+      }),
+    enabled: Boolean(companyId && workspaceId && selectedConversationId),
+  });
+
+  useEffect(() => {
+    if (!conversationsQuery.data?.items) {
+      return;
+    }
+
+    const availableConversationIds = new Set(
+      conversationsQuery.data.items.map((item) => item.id),
+    );
+    if (
+      selectedConversationId &&
+      availableConversationIds.has(selectedConversationId)
+    ) {
+      return;
+    }
+
+    const firstConversation = conversationsQuery.data.items[0];
+    if (firstConversation) {
+      setSelectedConversationId(firstConversation.id);
+      sessionStorage.setItem(CONVERSATION_STORAGE_KEY, firstConversation.id);
+      return;
+    }
+
+    setSelectedConversationId(undefined);
+    sessionStorage.removeItem(CONVERSATION_STORAGE_KEY);
+  }, [conversationsQuery.data?.items, selectedConversationId]);
+
+  useEffect(() => {
+    const container = messagesContainerRef.current;
+    if (!container) {
+      return;
+    }
+    container.scrollTop = container.scrollHeight;
+  }, [messagesQuery.data?.items, conversationsQuery.data?.items]);
 
   const chatMutation = useMutation({
     mutationFn: sendAssistantChat,
-    onSuccess: (data, variables) => {
-      if (data.conversationId) {
-        sessionStorage.setItem(CONVERSATION_STORAGE_KEY, data.conversationId);
-        setConversationId(data.conversationId);
+    onSuccess: (data) => {
+      const nextConversationId =
+        data.conversationId ?? selectedConversationId ?? undefined;
+      if (nextConversationId) {
+        setSelectedConversationId(nextConversationId);
+        sessionStorage.setItem(CONVERSATION_STORAGE_KEY, nextConversationId);
       }
-      setRecords((prev) => [
-        ...prev,
-        {
-          id: crypto.randomUUID(),
-          question: variables.message,
-          answer: data.answer,
-          sources: data.sources ?? [],
-        },
-      ]);
+      setLatestSources(data.sources ?? []);
       setMessage("");
+
+      void queryClient.invalidateQueries({
+        queryKey: ["assistant-conversations", companyId, workspaceId],
+      });
+      if (nextConversationId) {
+        void queryClient.invalidateQueries({
+          queryKey: [
+            "assistant-conversation-messages",
+            companyId,
+            workspaceId,
+            nextConversationId,
+          ],
+        });
+      }
     },
   });
 
@@ -63,106 +130,203 @@ export function ChatPage() {
     if (!message.trim() || !companyId || !workspaceId) {
       return;
     }
+
     chatMutation.mutate({
       companyId,
       workspaceId,
       message: message.trim(),
-      conversationId,
+      conversationId: selectedConversationId,
     });
   };
 
-  const resetConversation = () => {
+  const startNewConversation = () => {
+    setSelectedConversationId(undefined);
+    setLatestSources([]);
     sessionStorage.removeItem(CONVERSATION_STORAGE_KEY);
-    setConversationId(undefined);
-    setRecords([]);
   };
 
-  return (
-    <Stack spacing={3}>
-      <Paper elevation={0} sx={{ p: 3, border: "1px solid", borderColor: "divider" }}>
-        <Stack spacing={2}>
-          <Typography variant="h5">Assistant Chat</Typography>
-          <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
-            <Typography variant="body2">Step 5 of 5: Ask, then continue same conversation</Typography>
-            <Chip
-              size="small"
-              color={conversationId ? "success" : "default"}
-              label={conversationId ? "Conversation active" : "New conversation"}
-            />
-          </Stack>
-          {conversationId ? (
-            <Typography variant="caption" color="text.secondary">
-              conversationId: {conversationId}
-            </Typography>
-          ) : null}
-          {!companyId || !workspaceId ? (
-            <Alert severity="warning">Set company/workspace IDs on Dashboard first.</Alert>
-          ) : null}
-          {chatError ? <Alert severity="error">{String(chatError)}</Alert> : null}
-          <TextField
-            label="Message"
-            multiline
-            minRows={3}
-            value={message}
-            onChange={(event) => setMessage(event.target.value)}
-            fullWidth
-          />
-          <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5}>
-            <Button
-              variant="contained"
-              onClick={sendMessage}
-              disabled={!message.trim() || !companyId || !workspaceId || chatMutation.isPending}
-            >
-              {chatMutation.isPending ? "Sending..." : "Send"}
-            </Button>
-            <Button variant="outlined" onClick={resetConversation}>
-              New Conversation
-            </Button>
-          </Stack>
-        </Stack>
-      </Paper>
+  const selectedConversationMessages = messagesQuery.data?.items ?? [];
+  const orderedConversations = useMemo(
+    () => conversationsQuery.data?.items ?? [],
+    [conversationsQuery.data?.items],
+  );
 
-      <Paper elevation={0} sx={{ p: 3, border: "1px solid", borderColor: "divider" }}>
-        <Stack spacing={2}>
-          <Typography variant="h6">Responses</Typography>
-          {records.length === 0 ? (
-            <Typography variant="body2" color="text.secondary">
-              No messages yet.
-            </Typography>
-          ) : (
-            <List disablePadding>
-              {records.map((record) => (
-                <Stack key={record.id} spacing={1.5} sx={{ mb: 2 }}>
-                  <Typography variant="subtitle2">Q: {record.question}</Typography>
-                  <Typography variant="body1">A: {record.answer}</Typography>
+  return (
+    <Stack spacing={2}>
+      <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
+        <Typography variant="h5">Assistant Chat</Typography>
+        <Chip
+          size="small"
+          color={selectedConversationId ? "success" : "default"}
+          label={selectedConversationId ? "Conversation active" : "New conversation"}
+        />
+      </Stack>
+
+      {!companyId || !workspaceId ? (
+        <Alert severity="warning">
+          Set company/workspace IDs on Dashboard first.
+        </Alert>
+      ) : null}
+      {chatError ? <Alert severity="error">{String(chatError)}</Alert> : null}
+
+      <Stack
+        direction={{ xs: "column", md: "row" }}
+        spacing={2}
+        sx={{ minHeight: "70vh" }}
+      >
+        <Paper
+          elevation={0}
+          sx={{
+            width: { xs: "100%", md: 320 },
+            border: "1px solid",
+            borderColor: "divider",
+            display: "flex",
+            flexDirection: "column",
+          }}
+        >
+          <Box sx={{ p: 2, borderBottom: "1px solid", borderColor: "divider" }}>
+            <Button variant="outlined" fullWidth onClick={startNewConversation}>
+              New conversation
+            </Button>
+          </Box>
+          {conversationsQuery.isLoading ? <LinearProgress /> : null}
+          <List sx={{ p: 0, overflowY: "auto" }}>
+            {orderedConversations.map((conversation) => (
+              <ListItemButton
+                key={conversation.id}
+                selected={conversation.id === selectedConversationId}
+                onClick={() => {
+                  setSelectedConversationId(conversation.id);
+                  sessionStorage.setItem(CONVERSATION_STORAGE_KEY, conversation.id);
+                }}
+                sx={{
+                  alignItems: "flex-start",
+                  borderBottom: "1px solid",
+                  borderColor: "divider",
+                }}
+              >
+                <ListItemText
+                  primary={
+                    conversation.lastMessage?.content?.slice(0, 50) ||
+                    "New conversation"
+                  }
+                  secondary={new Date(conversation.updatedAt).toLocaleString()}
+                />
+              </ListItemButton>
+            ))}
+            {orderedConversations.length === 0 ? (
+              <Box sx={{ p: 2 }}>
+                <Typography variant="body2" color="text.secondary">
+                  No conversations yet.
+                </Typography>
+              </Box>
+            ) : null}
+          </List>
+        </Paper>
+
+        <Paper
+          elevation={0}
+          sx={{
+            flex: 1,
+            border: "1px solid",
+            borderColor: "divider",
+            display: "flex",
+            flexDirection: "column",
+          }}
+        >
+          <Box
+            ref={messagesContainerRef}
+            sx={{
+              flex: 1,
+              p: 2,
+              overflowY: "auto",
+              display: "flex",
+              flexDirection: "column",
+              gap: 1.5,
+            }}
+          >
+            {messagesQuery.isLoading ? <LinearProgress /> : null}
+            {selectedConversationMessages.length === 0 ? (
+              <Typography variant="body2" color="text.secondary">
+                Send a message to start chatting.
+              </Typography>
+            ) : (
+              selectedConversationMessages.map((item) => {
+                const isUser = item.role === "USER";
+                return (
+                  <Box
+                    key={item.id}
+                    sx={{
+                      alignSelf: isUser ? "flex-end" : "flex-start",
+                      maxWidth: "85%",
+                      px: 1.5,
+                      py: 1.2,
+                      borderRadius: 2,
+                      bgcolor: isUser ? "primary.main" : "grey.100",
+                      color: isUser ? "primary.contrastText" : "text.primary",
+                    }}
+                  >
+                    <Typography variant="body2" sx={{ whiteSpace: "pre-wrap" }}>
+                      {item.content}
+                    </Typography>
+                    <Typography
+                      variant="caption"
+                      sx={{ opacity: 0.8, display: "block", mt: 0.75 }}
+                    >
+                      {new Date(item.createdAt).toLocaleTimeString()}
+                    </Typography>
+                  </Box>
+                );
+              })
+            )}
+          </Box>
+
+          <Divider />
+          <Box sx={{ p: 2 }}>
+            <Stack spacing={1.5}>
+              <TextField
+                label="Ask your assistant..."
+                multiline
+                minRows={2}
+                value={message}
+                onChange={(event) => setMessage(event.target.value)}
+                fullWidth
+              />
+              <Button
+                variant="contained"
+                onClick={sendMessage}
+                disabled={
+                  !message.trim() ||
+                  !companyId ||
+                  !workspaceId ||
+                  chatMutation.isPending
+                }
+              >
+                {chatMutation.isPending ? "Sending..." : "Send"}
+              </Button>
+              {latestSources.length > 0 ? (
+                <Box>
                   <Typography variant="caption" color="text.secondary">
-                    Sources:
+                    Sources from latest answer:
                   </Typography>
-                  <Stack spacing={0.75}>
-                    {record.sources.length === 0 ? (
-                      <Typography variant="body2" color="text.secondary">
-                        No sources returned.
+                  <Stack spacing={0.5} sx={{ mt: 0.5 }}>
+                    {latestSources.map((source) => (
+                      <Typography
+                        key={`${source.chunkId}-${source.assetId}`}
+                        variant="body2"
+                        color="text.secondary"
+                      >
+                        {source.filename} — relevance{" "}
+                        {source.similarityScore.toFixed(3)}
                       </Typography>
-                    ) : (
-                      record.sources.map((source) => (
-                        <ListItem
-                          key={`${record.id}-${source.chunkId}`}
-                          sx={{ px: 1.5, py: 0.75, border: "1px solid", borderColor: "divider" }}
-                        >
-                          <Typography variant="body2">
-                            {source.filename} — relevance {source.similarityScore.toFixed(3)}
-                          </Typography>
-                        </ListItem>
-                      ))
-                    )}
+                    ))}
                   </Stack>
-                  <Divider />
-                </Stack>
-              ))}
-            </List>
-          )}
-        </Stack>
-      </Paper>
+                </Box>
+              ) : null}
+            </Stack>
+          </Box>
+        </Paper>
+      </Stack>
     </Stack>
   );
 }

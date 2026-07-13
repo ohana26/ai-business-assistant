@@ -35,6 +35,8 @@ export type RegisterRequest = {
   email: string;
   password: string;
   displayName?: string;
+  companyName?: string;
+  workspaceName?: string;
 };
 
 export type AuthResponse = {
@@ -74,6 +76,34 @@ export type AssistantChatResponse = {
   answer: string;
   conversationId?: string;
   sources?: AssistantSource[];
+};
+
+export type ConversationSummary = {
+  id: string;
+  createdAt: string;
+  updatedAt: string;
+  lastMessage: {
+    id: string;
+    role: string;
+    content: string;
+    createdAt: string;
+  } | null;
+};
+
+export type ConversationsResponse = {
+  items: ConversationSummary[];
+};
+
+export type ConversationMessage = {
+  id: string;
+  role: "USER" | "ASSISTANT" | "SYSTEM";
+  content: string;
+  createdAt: string;
+};
+
+export type ConversationMessagesResponse = {
+  conversationId: string;
+  items: ConversationMessage[];
 };
 
 export async function login(payload: LoginRequest): Promise<AuthResponse> {
@@ -139,6 +169,39 @@ export async function sendAssistantChat(params: {
       message: params.message,
       conversationId: params.conversationId,
     },
+    {
+      headers: {
+        "x-company-id": params.companyId,
+        "x-workspace-id": params.workspaceId,
+      },
+    },
+  );
+  return response.data;
+}
+
+export async function fetchAssistantConversations(params: {
+  companyId: string;
+  workspaceId: string;
+}) {
+  const response = await apiClient.get<ConversationsResponse>(
+    "/assistant/conversations",
+    {
+      headers: {
+        "x-company-id": params.companyId,
+        "x-workspace-id": params.workspaceId,
+      },
+    },
+  );
+  return response.data;
+}
+
+export async function fetchConversationMessages(params: {
+  companyId: string;
+  workspaceId: string;
+  conversationId: string;
+}) {
+  const response = await apiClient.get<ConversationMessagesResponse>(
+    `/assistant/conversations/${params.conversationId}/messages`,
     {
       headers: {
         "x-company-id": params.companyId,
