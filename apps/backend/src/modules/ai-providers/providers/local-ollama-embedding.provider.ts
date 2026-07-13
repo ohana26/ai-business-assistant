@@ -20,25 +20,54 @@ export class LocalOllamaEmbeddingProvider implements EmbeddingProvider {
   }
 
   async createEmbedding(input: string): Promise<number[]> {
-    const response = await fetch(`${this.baseUrl}/api/embeddings`, {
+    const payload = JSON.stringify({
+      model: this.model,
+      prompt: input,
+      input,
+    });
+    const legacyResponse = await fetch(`${this.baseUrl}/api/embeddings`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: this.model,
-        prompt: input,
-      }),
+      body: payload,
     });
-    if (!response.ok) {
-      this.logger.error(`Ollama embedding request failed: ${response.status}`);
+
+    if (legacyResponse.ok) {
+      const legacyPayload = (await legacyResponse.json()) as {
+        embedding?: number[];
+      };
+      if (!legacyPayload.embedding || legacyPayload.embedding.length === 0) {
+        throw new Error('Ollama embedding response was empty');
+      }
+      return legacyPayload.embedding;
+    }
+
+    if (legacyResponse.status !== 404) {
+      this.logger.error(
+        `Ollama embedding request failed: ${legacyResponse.status}`,
+      );
       throw new Error('Failed to generate embedding from Ollama');
     }
 
-    const payload = (await response.json()) as { embedding?: number[] };
-    if (!payload.embedding || payload.embedding.length === 0) {
+    const embedResponse = await fetch(`${this.baseUrl}/api/embed`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: payload,
+    });
+    if (!embedResponse.ok) {
+      this.logger.error(`Ollama embed request failed: ${embedResponse.status}`);
+      throw new Error('Failed to generate embedding from Ollama');
+    }
+
+    const embedPayload = (await embedResponse.json()) as {
+      embeddings?: number[][];
+      embedding?: number[];
+    };
+    const vector = embedPayload.embedding ?? embedPayload.embeddings?.[0];
+    if (!vector || vector.length === 0) {
       throw new Error('Ollama embedding response was empty');
     }
 
-    return payload.embedding;
+    return vector;
   }
 
   getModelName(): string {

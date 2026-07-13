@@ -25,6 +25,21 @@ import {
 import { useWorkspaceStore } from "../store/workspaceStore";
 
 const CONVERSATION_STORAGE_KEY = "ai-assistant-conversation-id";
+const conversationListQueryKey = (
+  companyId: string | null,
+  workspaceId: string | null,
+) => ["assistant-conversations", companyId, workspaceId] as const;
+const conversationMessagesQueryKey = (
+  companyId: string | null,
+  workspaceId: string | null,
+  conversationId?: string,
+) =>
+  [
+    "assistant-conversation-messages",
+    companyId,
+    workspaceId,
+    conversationId,
+  ] as const;
 
 export function ChatPage() {
   const queryClient = useQueryClient();
@@ -38,18 +53,20 @@ export function ChatPage() {
   const messagesContainerRef = useRef<HTMLDivElement | null>(null);
 
   const conversationsQuery = useQuery({
-    queryKey: ["assistant-conversations", companyId, workspaceId],
+    queryKey: conversationListQueryKey(companyId, workspaceId),
     queryFn: () => fetchAssistantConversations({ companyId, workspaceId }),
     enabled: Boolean(companyId && workspaceId),
+    refetchOnMount: "always",
+    refetchOnWindowFocus: true,
+    refetchInterval: companyId && workspaceId ? 5000 : false,
   });
 
   const messagesQuery = useQuery({
-    queryKey: [
-      "assistant-conversation-messages",
+    queryKey: conversationMessagesQueryKey(
       companyId,
       workspaceId,
       selectedConversationId,
-    ],
+    ),
     queryFn: () =>
       fetchConversationMessages({
         companyId,
@@ -57,6 +74,9 @@ export function ChatPage() {
         conversationId: selectedConversationId as string,
       }),
     enabled: Boolean(companyId && workspaceId && selectedConversationId),
+    refetchOnMount: "always",
+    refetchOnWindowFocus: true,
+    refetchInterval: companyId && workspaceId && selectedConversationId ? 3000 : false,
   });
 
   useEffect(() => {
@@ -95,7 +115,7 @@ export function ChatPage() {
 
   const chatMutation = useMutation({
     mutationFn: sendAssistantChat,
-    onSuccess: (data) => {
+    onSuccess: async (data) => {
       const nextConversationId =
         data.conversationId ?? selectedConversationId ?? undefined;
       if (nextConversationId) {
@@ -105,19 +125,28 @@ export function ChatPage() {
       setLatestSources(data.sources ?? []);
       setMessage("");
 
-      void queryClient.invalidateQueries({
-        queryKey: ["assistant-conversations", companyId, workspaceId],
+      const listKey = conversationListQueryKey(companyId, workspaceId);
+      const messagesKey = conversationMessagesQueryKey(
+        companyId,
+        workspaceId,
+        nextConversationId,
+      );
+      await queryClient.invalidateQueries({
+        queryKey: listKey,
       });
       if (nextConversationId) {
-        void queryClient.invalidateQueries({
-          queryKey: [
-            "assistant-conversation-messages",
-            companyId,
-            workspaceId,
-            nextConversationId,
-          ],
+        await queryClient.invalidateQueries({
+          queryKey: messagesKey,
+        });
+        await queryClient.refetchQueries({
+          queryKey: messagesKey,
+          exact: true,
         });
       }
+      await queryClient.refetchQueries({
+        queryKey: listKey,
+        exact: true,
+      });
     },
   });
 
