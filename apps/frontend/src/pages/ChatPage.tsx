@@ -24,6 +24,7 @@ import {
 } from "../api";
 import { useWorkspaceStore } from "../store/workspaceStore";
 import { useOnboardingStore } from "../store/onboardingStore";
+import { useAuthSession } from "../auth/useAuthSession";
 
 const CONVERSATION_STORAGE_KEY = "ai-assistant-conversation-id";
 const conversationListQueryKey = (
@@ -44,6 +45,7 @@ const conversationMessagesQueryKey = (
 
 export function ChatPage() {
   const queryClient = useQueryClient();
+  const { isAuthenticated } = useAuthSession();
   const companyId = useWorkspaceStore((state) => state.companyId);
   const workspaceId = useWorkspaceStore((state) => state.workspaceId);
   const assistantProfile = useOnboardingStore((state) =>
@@ -54,15 +56,16 @@ export function ChatPage() {
     string | undefined
   >(sessionStorage.getItem(CONVERSATION_STORAGE_KEY) ?? undefined);
   const [latestSources, setLatestSources] = useState<AssistantSource[]>([]);
+  const [pendingUserMessage, setPendingUserMessage] = useState<string | null>(null);
   const messagesContainerRef = useRef<HTMLDivElement | null>(null);
 
   const conversationsQuery = useQuery({
     queryKey: conversationListQueryKey(companyId, workspaceId),
     queryFn: () => fetchAssistantConversations({ companyId, workspaceId }),
-    enabled: Boolean(companyId && workspaceId),
+    enabled: Boolean(isAuthenticated && companyId && workspaceId),
     refetchOnMount: "always",
     refetchOnWindowFocus: true,
-    refetchInterval: companyId && workspaceId ? 5000 : false,
+    refetchInterval: false,
   });
 
   const messagesQuery = useQuery({
@@ -77,11 +80,23 @@ export function ChatPage() {
         workspaceId,
         conversationId: selectedConversationId as string,
       }),
-    enabled: Boolean(companyId && workspaceId && selectedConversationId),
+    enabled: Boolean(isAuthenticated && companyId && workspaceId && selectedConversationId),
     refetchOnMount: "always",
     refetchOnWindowFocus: true,
-    refetchInterval: companyId && workspaceId && selectedConversationId ? 3000 : false,
+    refetchInterval: false,
   });
+
+  useEffect(() => {
+    if (!(messagesQuery.error instanceof AxiosError)) {
+      return;
+    }
+    const status = messagesQuery.error.response?.status;
+    if (status !== 403 && status !== 404) {
+      return;
+    }
+    setSelectedConversationId(undefined);
+    sessionStorage.removeItem(CONVERSATION_STORAGE_KEY);
+  }, [messagesQuery.error]);
 
   useEffect(() => {
     if (!conversationsQuery.data?.items) {
@@ -119,6 +134,10 @@ export function ChatPage() {
 
   const chatMutation = useMutation({
     mutationFn: sendAssistantChat,
+    onMutate: async (variables) => {
+      setPendingUserMessage(variables.message);
+      setMessage("");
+    },
     onSuccess: async (data) => {
       const nextConversationId =
         data.conversationId ?? selectedConversationId ?? undefined;
@@ -127,7 +146,7 @@ export function ChatPage() {
         sessionStorage.setItem(CONVERSATION_STORAGE_KEY, nextConversationId);
       }
       setLatestSources(data.sources ?? []);
-      setMessage("");
+      setPendingUserMessage(null);
 
       const listKey = conversationListQueryKey(companyId, workspaceId);
       const messagesKey = conversationMessagesQueryKey(
@@ -151,6 +170,9 @@ export function ChatPage() {
         queryKey: listKey,
         exact: true,
       });
+    },
+    onError: () => {
+      setPendingUserMessage(null);
     },
   });
 
@@ -346,6 +368,39 @@ export function ChatPage() {
                 );
               })
             )}
+            {pendingUserMessage ? (
+              <Box
+                sx={{
+                  alignSelf: "flex-end",
+                  maxWidth: "85%",
+                  px: 1.5,
+                  py: 1.2,
+                  borderRadius: 2,
+                  bgcolor: "primary.main",
+                  color: "primary.contrastText",
+                }}
+              >
+                <Typography variant="body2" sx={{ whiteSpace: "pre-wrap" }}>
+                  {pendingUserMessage}
+                </Typography>
+              </Box>
+            ) : null}
+            {chatMutation.isPending ? (
+              <Box
+                sx={{
+                  alignSelf: "flex-start",
+                  maxWidth: "85%",
+                  px: 1.5,
+                  py: 1.2,
+                  borderRadius: 2,
+                  bgcolor: "grey.100",
+                }}
+              >
+                <Typography variant="body2" color="text.secondary">
+                  Assistant is thinking...
+                </Typography>
+              </Box>
+            ) : null}
           </Box>
 
           <Divider />

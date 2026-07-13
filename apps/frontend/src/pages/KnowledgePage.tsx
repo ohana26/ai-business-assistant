@@ -19,6 +19,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { AxiosError } from "axios";
 import { fetchKnowledgeAssets, uploadKnowledgeAsset } from "../api";
 import { useWorkspaceStore } from "../store/workspaceStore";
+import { useAuthSession } from "../auth/useAuthSession";
 
 function formatBytes(bytesAsString: string): string {
   const bytes = Number(bytesAsString);
@@ -36,6 +37,7 @@ function formatBytes(bytesAsString: string): string {
 
 export function KnowledgePage() {
   const queryClient = useQueryClient();
+  const { isAuthenticated } = useAuthSession();
   const companyId = useWorkspaceStore((state) => state.companyId);
   const workspaceId = useWorkspaceStore((state) => state.workspaceId);
   const collectionId = useWorkspaceStore((state) => state.collectionId);
@@ -47,7 +49,7 @@ export function KnowledgePage() {
   const assetsQuery = useQuery({
     queryKey: ["knowledge-assets", companyId, workspaceId],
     queryFn: () => fetchKnowledgeAssets({ companyId, workspaceId }),
-    enabled: Boolean(companyId && workspaceId),
+    enabled: Boolean(isAuthenticated && companyId && workspaceId),
   });
 
   const uploadMutation = useMutation({
