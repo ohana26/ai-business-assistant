@@ -3,12 +3,16 @@ import { Box, Button, Chip, Typography } from "@mui/material";
 import { useNavigate } from "react-router-dom";
 import { useAuthStore } from "../../store/authStore";
 import { useWorkspaceStore } from "../../store/workspaceStore";
+import { useOnboardingStore } from "../../store/onboardingStore";
 
 export function TopNavigation() {
   const navigate = useNavigate();
   const clearAuth = useAuthStore((state) => state.clearAuth);
   const companyId = useWorkspaceStore((state) => state.companyId);
   const workspaceId = useWorkspaceStore((state) => state.workspaceId);
+  const assistantProfile = useOnboardingStore((state) =>
+    state.getAssistantProfile(companyId, workspaceId),
+  );
 
   const handleLogout = () => {
     clearAuth();
@@ -37,6 +41,10 @@ export function TopNavigation() {
         <Box sx={{ display: "flex", gap: 1, mt: 0.5, flexWrap: "wrap" }}>
           <Chip size="small" label={`Company: ${companyId || "Not set"}`} />
           <Chip size="small" label={`Workspace: ${workspaceId || "Not set"}`} />
+          <Chip
+            size="small"
+            label={`Assistant: ${assistantProfile?.assistantName || "Not configured"}`}
+          />
         </Box>
       </Box>
 

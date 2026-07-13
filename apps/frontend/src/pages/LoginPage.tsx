@@ -6,12 +6,14 @@ import { AxiosError } from "axios";
 import { login, register } from "../services/api";
 import { useAuthStore } from "../store/authStore";
 import { useWorkspaceStore } from "../store/workspaceStore";
+import { useOnboardingStore } from "../store/onboardingStore";
 
 export function LoginPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const setSession = useAuthStore((state) => state.setSession);
   const setContext = useWorkspaceStore((state) => state.setContext);
+  const hasCompletedOnboarding = useOnboardingStore((state) => state.isCompleted);
   const [mode, setMode] = useState<"login" | "register">("login");
   const [displayName, setDisplayName] = useState("");
   const [companyName, setCompanyName] = useState("");
@@ -25,6 +27,14 @@ export function LoginPage() {
       setSession({ token: data.accessToken, user: data.user ?? null });
       if (data.onboarding) {
         setContext(data.onboarding);
+      }
+      const context = data.onboarding ?? {
+        companyId: useWorkspaceStore.getState().companyId,
+        workspaceId: useWorkspaceStore.getState().workspaceId,
+      };
+      if (!hasCompletedOnboarding(context.companyId, context.workspaceId)) {
+        navigate("/onboarding", { replace: true });
+        return;
       }
       const nextPath =
         typeof location.state === "object" &&
@@ -44,7 +54,7 @@ export function LoginPage() {
       if (data.onboarding) {
         setContext(data.onboarding);
       }
-      navigate("/dashboard", { replace: true });
+      navigate("/onboarding", { replace: true });
     },
   });
 
@@ -98,7 +108,8 @@ export function LoginPage() {
               AI Business Assistant
             </Typography>
             <Typography variant="body2" color="text.secondary" sx={{ mt: 0.75 }}>
-              Step 1: Register (or login), then continue the RAG test cycle.
+              Create your company workspace, onboard assistant settings, upload
+              knowledge, and launch employee chat.
             </Typography>
           </Box>
           <Tabs value={mode} onChange={(_e, value) => setMode(value)}>

@@ -23,6 +23,7 @@ import {
   type AssistantSource,
 } from "../services/api";
 import { useWorkspaceStore } from "../store/workspaceStore";
+import { useOnboardingStore } from "../store/onboardingStore";
 
 const CONVERSATION_STORAGE_KEY = "ai-assistant-conversation-id";
 const conversationListQueryKey = (
@@ -45,6 +46,9 @@ export function ChatPage() {
   const queryClient = useQueryClient();
   const companyId = useWorkspaceStore((state) => state.companyId);
   const workspaceId = useWorkspaceStore((state) => state.workspaceId);
+  const assistantProfile = useOnboardingStore((state) =>
+    state.getAssistantProfile(companyId, workspaceId),
+  );
   const [message, setMessage] = useState("");
   const [selectedConversationId, setSelectedConversationId] = useState<
     string | undefined
@@ -195,23 +199,22 @@ export function ChatPage() {
         <Stack spacing={0.75}>
           <Typography variant="subtitle2">What this system is</Typography>
           <Typography variant="body2" color="text.secondary">
-            This is an AI Business Assistant platform. It answers using your
-            uploaded company knowledge inside the selected company/workspace
-            context.
+            {assistantProfile?.assistantName || "Your assistant"} supports employees
+            with company answers grounded in uploaded business knowledge.
           </Typography>
           <Typography variant="subtitle2" sx={{ mt: 1 }}>
-            General usage
+            Assistant role
           </Typography>
           <Typography variant="body2" color="text.secondary">
-            1) Select or start a conversation, 2) ask normal business questions,
-            3) upload more documents in Knowledge page when context is missing.
+            {assistantProfile?.roleDescription ||
+              "General company knowledge and process assistant"}
           </Typography>
           <Typography variant="subtitle2" sx={{ mt: 1 }}>
-            Assistant type: Knowledge Assistant
+            Response style
           </Typography>
           <Typography variant="body2" color="text.secondary">
-            Best for policy/procedure/company-doc questions. Responses include
-            sources from retrieved document chunks.
+            {assistantProfile?.answerStyle || "balanced"} responses. Sources are shown
+            when document chunks are retrieved.
           </Typography>
         </Stack>
       </Paper>

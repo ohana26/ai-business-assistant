@@ -1,136 +1,184 @@
-import { useEffect, useState } from "react";
-import { Alert, Button, Chip, Paper, Stack, TextField, Typography } from "@mui/material";
+import { useState } from "react";
+import {
+  Alert,
+  Button,
+  Chip,
+  Divider,
+  Paper,
+  Stack,
+  TextField,
+  Typography,
+} from "@mui/material";
 import { Link as RouterLink } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
 import { useWorkspaceStore } from "../store/workspaceStore";
 import { useAuthStore } from "../store/authStore";
+import { fetchAssistantConversations, fetchKnowledgeAssets } from "../services/api";
+import { useOnboardingStore } from "../store/onboardingStore";
 
 export function DashboardPage() {
-  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
   const user = useAuthStore((state) => state.user);
   const companyId = useWorkspaceStore((state) => state.companyId);
   const workspaceId = useWorkspaceStore((state) => state.workspaceId);
   const collectionId = useWorkspaceStore((state) => state.collectionId);
-  const setContext = useWorkspaceStore((state) => state.setContext);
-  const [companyInput, setCompanyInput] = useState(companyId);
-  const [workspaceInput, setWorkspaceInput] = useState(workspaceId);
-  const [collectionInput, setCollectionInput] = useState(collectionId);
+  const assistantProfile = useOnboardingStore((state) =>
+    state.getAssistantProfile(companyId, workspaceId),
+  );
+  const invitedEmployees = useOnboardingStore((state) =>
+    state.getInvitedEmployees(companyId, workspaceId),
+  );
+  const addInvitedEmployee = useOnboardingStore((state) => state.addInvitedEmployee);
+  const [inviteEmail, setInviteEmail] = useState("");
 
-  useEffect(() => {
-    setCompanyInput(companyId);
-    setWorkspaceInput(workspaceId);
-    setCollectionInput(collectionId);
-  }, [companyId, workspaceId, collectionId]);
+  const assetsQuery = useQuery({
+    queryKey: ["dashboard-assets-summary", companyId, workspaceId],
+    queryFn: () => fetchKnowledgeAssets({ companyId, workspaceId }),
+    enabled: Boolean(companyId && workspaceId),
+  });
 
-  const hasContext = Boolean(companyId && workspaceId);
+  const conversationsQuery = useQuery({
+    queryKey: ["dashboard-conversations-summary", companyId, workspaceId],
+    queryFn: () => fetchAssistantConversations({ companyId, workspaceId }),
+    enabled: Boolean(companyId && workspaceId),
+  });
+
+  const readyAssetsCount = (assetsQuery.data?.items ?? []).filter(
+    (asset) => asset.status === "READY",
+  ).length;
 
   return (
     <Stack spacing={3}>
       <Paper elevation={0} sx={{ p: 3, border: "1px solid", borderColor: "divider" }}>
-        <Stack spacing={1.5}>
-          <Typography variant="h5">Welcome</Typography>
+        <Stack spacing={1.25}>
+          <Typography variant="h5">Admin Dashboard</Typography>
           <Typography variant="body2" color="text.secondary">
-            Your workspace is ready. You can upload knowledge and chat immediately.
+            Manage your organization onboarding, assistant configuration, knowledge,
+            and employee adoption from one place.
           </Typography>
-          <Stack spacing={0.5}>
+          <Stack spacing={0.4}>
             <Typography variant="body2">
-              <strong>Name:</strong> {user?.displayName || "Not set"}
+              <strong>Admin:</strong> {user?.displayName || "Not set"}
             </Typography>
             <Typography variant="body2">
               <strong>Email:</strong> {user?.email || "Not available"}
             </Typography>
             <Typography variant="body2">
-              <strong>Company ID:</strong> {companyId || "Not available"}
-            </Typography>
-            <Typography variant="body2">
-              <strong>Workspace ID:</strong> {workspaceId || "Not available"}
-            </Typography>
-            <Typography variant="body2">
-              <strong>Default Collection ID:</strong> {collectionId || "Not available"}
+              <strong>Assistant:</strong>{" "}
+              {assistantProfile?.assistantName || "Not configured"}
             </Typography>
           </Stack>
-          <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5}>
+          <Stack direction="row" spacing={1} sx={{ flexWrap: "wrap", gap: 1 }}>
+            <Chip label={`Company: ${companyId || "N/A"}`} size="small" />
+            <Chip label={`Workspace: ${workspaceId || "N/A"}`} size="small" />
+            <Chip label={`Collection: ${collectionId || "N/A"}`} size="small" />
+          </Stack>
+          <Stack direction={{ xs: "column", sm: "row" }} spacing={1.25}>
+            <Button component={RouterLink} to="/onboarding" variant="outlined">
+              Open Onboarding
+            </Button>
             <Button component={RouterLink} to="/knowledge" variant="outlined">
-              Upload Knowledge
+              Manage Knowledge
             </Button>
             <Button component={RouterLink} to="/chat" variant="outlined">
-              Open Chat
+              Open Assistant Chat
             </Button>
+          </Stack>
+        </Stack>
+      </Paper>
+
+      <Paper elevation={0} sx={{ p: 3, border: "1px solid", borderColor: "divider" }}>
+        <Stack spacing={1.25}>
+          <Typography variant="h6">Product Flow Status</Typography>
+          <Stack spacing={1}>
+            <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
+              <Typography variant="body2">1) Company signup/login</Typography>
+              <Chip size="small" label="Complete" color="success" />
+            </Stack>
+            <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
+              <Typography variant="body2">2) Organization onboarding wizard</Typography>
+              <Chip
+                size="small"
+                label={assistantProfile ? "Complete" : "Pending"}
+                color={assistantProfile ? "success" : "default"}
+              />
+            </Stack>
+            <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
+              <Typography variant="body2">3) Upload company knowledge</Typography>
+              <Chip
+                size="small"
+                label={readyAssetsCount > 0 ? `${readyAssetsCount} ready` : "Pending"}
+                color={readyAssetsCount > 0 ? "success" : "default"}
+              />
+            </Stack>
+            <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
+              <Typography variant="body2">4) Employees use personalized assistant</Typography>
+              <Chip
+                size="small"
+                label={
+                  (conversationsQuery.data?.items.length ?? 0) > 0
+                    ? `${conversationsQuery.data?.items.length ?? 0} conversations`
+                    : "Pending"
+                }
+                color={
+                  (conversationsQuery.data?.items.length ?? 0) > 0
+                    ? "success"
+                    : "default"
+                }
+              />
+            </Stack>
           </Stack>
         </Stack>
       </Paper>
 
       <Paper elevation={0} sx={{ p: 3, border: "1px solid", borderColor: "divider" }}>
         <Stack spacing={1.5}>
-          <Typography variant="h6">Usage order</Typography>
+          <Typography variant="h6">Employee Invitations</Typography>
           <Typography variant="body2" color="text.secondary">
-            Follow these steps in sequence for full end-to-end testing.
+            Invite workflow is local for now and represents the upcoming SaaS
+            invitation backend flow.
           </Typography>
-          <Stack spacing={1}>
-            <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
-              <Typography variant="body2">1) Register user in Login screen</Typography>
-              <Chip size="small" label={isAuthenticated ? "Done" : "Pending"} color={isAuthenticated ? "success" : "default"} />
-            </Stack>
-            <Typography variant="body2">2) Login and open Dashboard</Typography>
-            <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
-              <Typography variant="body2">3) Set Company + Workspace + Collection IDs</Typography>
-              <Chip size="small" label={hasContext ? "Done" : "Pending"} color={hasContext ? "success" : "default"} />
-            </Stack>
-            <Typography variant="body2">4) Go to Knowledge page and upload a document</Typography>
-            <Typography variant="body2">5) Go to Chat page, ask questions, continue same conversation</Typography>
-          </Stack>
-        </Stack>
-      </Paper>
-
-      <Paper elevation={0} sx={{ p: 3, border: "1px solid", borderColor: "divider" }}>
-        <Stack spacing={2}>
-          <Typography variant="h6">Context override (optional)</Typography>
-          <Typography variant="body2" color="text.secondary">
-            You usually do not need this. It is available only for advanced/manual overrides.
-          </Typography>
-          {!hasContext ? (
-            <Alert severity="warning">Set company and workspace IDs before testing APIs.</Alert>
+          {!companyId || !workspaceId ? (
+            <Alert severity="warning">Company/workspace context is missing.</Alert>
           ) : null}
-          <TextField
-            label="Company ID"
-            value={companyInput}
-            onChange={(event) => setCompanyInput(event.target.value)}
-            fullWidth
-          />
-          <TextField
-            label="Workspace ID"
-            value={workspaceInput}
-            onChange={(event) => setWorkspaceInput(event.target.value)}
-            fullWidth
-          />
-          <TextField
-            label="Default Collection ID (for uploads)"
-            value={collectionInput}
-            onChange={(event) => setCollectionInput(event.target.value)}
-            fullWidth
-          />
-          <Button
-            variant="contained"
-            onClick={() =>
-              setContext({
-                companyId: companyInput.trim(),
-                workspaceId: workspaceInput.trim(),
-                collectionId: collectionInput.trim(),
-              })
-            }
-          >
-            Save Context
-          </Button>
-        </Stack>
-      </Paper>
-
-      <Paper elevation={0} sx={{ p: 3, border: "1px solid", borderColor: "divider" }}>
-        <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5}>
-          <Button component={RouterLink} to="/knowledge" variant="outlined">
-            Go to Knowledge Assets
-          </Button>
-          <Button component={RouterLink} to="/chat" variant="outlined">
-            Go to Assistant Chat
-          </Button>
+          <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
+            <TextField
+              label="Employee email"
+              value={inviteEmail}
+              onChange={(event) => setInviteEmail(event.target.value)}
+              fullWidth
+            />
+            <Button
+              variant="contained"
+              disabled={!inviteEmail.trim() || !companyId || !workspaceId}
+              onClick={() => {
+                if (!companyId || !workspaceId) {
+                  return;
+                }
+                addInvitedEmployee(
+                  companyId,
+                  workspaceId,
+                  inviteEmail.trim().toLowerCase(),
+                );
+                setInviteEmail("");
+              }}
+            >
+              Invite
+            </Button>
+          </Stack>
+          <Divider />
+          <Stack spacing={0.75}>
+            {invitedEmployees.length === 0 ? (
+              <Typography variant="body2" color="text.secondary">
+                No invited employees yet.
+              </Typography>
+            ) : (
+              invitedEmployees.map((email) => (
+                <Typography key={email} variant="body2">
+                  {email}
+                </Typography>
+              ))
+            )}
+          </Stack>
         </Stack>
       </Paper>
     </Stack>
