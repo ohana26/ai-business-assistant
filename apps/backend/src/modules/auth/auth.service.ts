@@ -89,7 +89,8 @@ export class AuthService {
       source: 'auth.login',
     });
 
-    return this.issueTokensForUser(user, false);
+    const onboarding = await this.ensureUserTenantContext(user.id, user.email);
+    return this.issueTokensForUser(user, false, onboarding);
   }
 
   async refreshToken(
@@ -262,6 +263,73 @@ export class AuthService {
     });
   }
 
+  private async ensureUserTenantContext(userId: string, email: string) {
+    const activeMembership = await this.prisma.membership.findFirst({
+      where: {
+        userId,
+        status: 'ACTIVE',
+        deletedAt: null,
+        company: {
+          status: 'ACTIVE',
+          deletedAt: null,
+        },
+      },
+      select: {
+        companyId: true,
+      },
+    });
+
+    if (!activeMembership) {
+      return this.provisionDefaultTenantContext(userId, email);
+    }
+
+    const workspace = await this.prisma.workspace.findFirst({
+      where: {
+        companyId: activeMembership.companyId,
+        status: 'ACTIVE',
+        deletedAt: null,
+      },
+      select: { id: true },
+      orderBy: { createdAt: 'asc' },
+    });
+    if (!workspace) {
+      return this.provisionDefaultTenantContext(userId, email);
+    }
+
+    const knowledgeBase = await this.prisma.knowledgeBase.findFirst({
+      where: {
+        companyId: activeMembership.companyId,
+        workspaceId: workspace.id,
+        status: 'ACTIVE',
+        deletedAt: null,
+      },
+      select: { id: true },
+      orderBy: { createdAt: 'asc' },
+    });
+    if (!knowledgeBase) {
+      return this.provisionDefaultTenantContext(userId, email);
+    }
+
+    const collection = await this.prisma.collection.findFirst({
+      where: {
+        companyId: activeMembership.companyId,
+        knowledgeBaseId: knowledgeBase.id,
+        status: 'ACTIVE',
+        deletedAt: null,
+      },
+      select: { id: true },
+      orderBy: { createdAt: 'asc' },
+    });
+    if (!collection) {
+      return this.provisionDefaultTenantContext(userId, email);
+    }
+
+    return {
+      companyId: activeMembership.companyId,
+      workspaceId: workspace.id,
+      collectionId: collection.id,
+    };
+  }
   private async ensureDefaultUserRole(tx: Prisma.TransactionClient) {
     const existingRole = await tx.role.findFirst({
       where: {
