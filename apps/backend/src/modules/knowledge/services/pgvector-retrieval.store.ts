@@ -25,6 +25,7 @@ export class PgVectorRetrievalStore implements RetrievalStore {
         chunkIndex: number;
         assetId: string;
         assetTitle: string;
+        assetFilename: string;
         similarityScore: number;
       }>
     >(
@@ -35,6 +36,7 @@ export class PgVectorRetrievalStore implements RetrievalStore {
           c."chunkIndex" AS "chunkIndex",
           ka.id AS "assetId",
           ka.title AS "assetTitle",
+          ka.filename AS "assetFilename",
           1 - (e.vector <=> $1::vector) AS "similarityScore"
         FROM "Embedding" e
         INNER JOIN "Chunk" c ON c.id = e."chunkId"

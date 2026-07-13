@@ -12,7 +12,7 @@ export class PromptBuilderService {
     const contextText = params.chunks
       .map(
         (chunk, index) =>
-          `[Chunk ${index + 1} | Asset: ${chunk.assetTitle} | Score: ${chunk.similarityScore.toFixed(4)}]\n${chunk.chunkContent}`,
+          `[Chunk ${index + 1} | Asset: ${chunk.assetFilename} | Score: ${chunk.similarityScore.toFixed(4)}]\n${chunk.chunkContent}`,
       )
       .join('\n\n');
 

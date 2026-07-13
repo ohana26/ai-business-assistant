@@ -1,5 +1,11 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsNotEmpty, IsString, MaxLength } from 'class-validator';
+import {
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+  IsUUID,
+  MaxLength,
+} from 'class-validator';
 
 export class AssistantChatDto {
   @ApiProperty({ example: 'What does our refund policy say?' })
@@ -7,4 +13,13 @@ export class AssistantChatDto {
   @IsNotEmpty()
   @MaxLength(4000)
   message!: string;
+
+  @ApiProperty({
+    required: false,
+    format: 'uuid',
+    description: 'Existing conversation id. If omitted, a new one is created.',
+  })
+  @IsOptional()
+  @IsUUID()
+  conversationId?: string;
 }

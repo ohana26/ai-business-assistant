@@ -3,7 +3,7 @@ import {
   ForbiddenException,
   Injectable,
 } from '@nestjs/common';
-import { MembershipStatus, UserStatus } from '@prisma/client';
+import { MembershipStatus, MessageRole, UserStatus } from '@prisma/client';
 import { PrismaService } from '../../database/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import type { CurrentUserContext } from '../auth/types/current-user-context.type';
@@ -26,6 +26,7 @@ export class AssistantsService {
     companyId?: string;
     workspaceId?: string;
     message: string;
+    conversationId?: string;
   }) {
     if (!params.companyId) {
       throw new BadRequestException('x-company-id header is required');
@@ -79,6 +80,67 @@ export class AssistantsService {
       );
     }
 
+    const conversation = params.conversationId
+      ? await this.prisma.conversation.findFirst({
+          where: {
+            id: params.conversationId,
+            companyId: params.companyId,
+            workspaceId: params.workspaceId,
+            userId: params.userContext.userId,
+            deletedAt: null,
+          },
+          select: { id: true },
+        })
+      : await this.prisma.conversation.create({
+          data: {
+            companyId: params.companyId,
+            workspaceId: params.workspaceId,
+            userId: params.userContext.userId,
+          },
+          select: { id: true },
+        });
+    if (!conversation) {
+      throw new ForbiddenException(
+        'Conversation is not accessible in the requested workspace',
+      );
+    }
+    if (!params.conversationId) {
+      await this.auditService.log({
+        companyId: params.companyId,
+        userId: params.userContext.userId,
+        action: 'assistant.conversation.created',
+        resourceType: 'assistant.conversation',
+        resourceId: conversation.id,
+        metadata: {
+          workspaceId: params.workspaceId,
+        },
+      });
+    }
+
+    const userMessage = await this.prisma.message.create({
+      data: {
+        conversationId: conversation.id,
+        companyId: params.companyId,
+        workspaceId: params.workspaceId,
+        userId: params.userContext.userId,
+        role: MessageRole.USER,
+        content: params.message,
+      },
+      select: { id: true, role: true },
+    });
+    await this.auditService.log({
+      companyId: params.companyId,
+      userId: params.userContext.userId,
+      action: 'assistant.message.created',
+      resourceType: 'assistant.message',
+      resourceId: userMessage.id,
+      metadata: {
+        workspaceId: params.workspaceId,
+        conversationId: conversation.id,
+        role: userMessage.role,
+      },
+    });
+
     const startedAt = Date.now();
     const retrievedChunks = await this.retrievalService.retrieveRelevantChunks(
       params.companyId,
@@ -94,6 +156,30 @@ export class AssistantsService {
     const chatProvider = this.aiProvidersService.getChatProvider();
     const answer = await chatProvider.generateResponse(prompt);
     const latency = Date.now() - startedAt;
+
+    const assistantMessage = await this.prisma.message.create({
+      data: {
+        conversationId: conversation.id,
+        companyId: params.companyId,
+        workspaceId: params.workspaceId,
+        userId: params.userContext.userId,
+        role: MessageRole.ASSISTANT,
+        content: answer,
+      },
+      select: { id: true, role: true },
+    });
+    await this.auditService.log({
+      companyId: params.companyId,
+      userId: params.userContext.userId,
+      action: 'assistant.message.created',
+      resourceType: 'assistant.message',
+      resourceId: assistantMessage.id,
+      metadata: {
+        workspaceId: params.workspaceId,
+        conversationId: conversation.id,
+        role: assistantMessage.role,
+      },
+    });
 
     await this.auditService.log({
       companyId: params.companyId,
@@ -114,6 +200,16 @@ export class AssistantsService {
       },
     });
 
-    return { answer };
+    return {
+      conversationId: conversation.id,
+      answer,
+      sources: retrievedChunks.map((chunk) => ({
+        chunkId: chunk.chunkId,
+        assetId: chunk.assetId,
+        filename: chunk.assetFilename,
+        title: chunk.assetTitle,
+        similarityScore: chunk.similarityScore,
+      })),
+    };
   }
 }

@@ -4,6 +4,7 @@ export type RetrievedChunk = {
   chunkIndex: number;
   assetId: string;
   assetTitle: string;
+  assetFilename: string;
   similarityScore: number;
 };
 

@@ -50,6 +50,7 @@ export class AssistantsController {
       companyId,
       workspaceId,
       message: body.message,
+      conversationId: body.conversationId,
     });
   }
 }

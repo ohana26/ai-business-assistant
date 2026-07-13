@@ -88,6 +88,12 @@ enum AssetContentType {
   OTHER
 }
 
+enum MessageRole {
+  USER
+  ASSISTANT
+  SYSTEM
+}
+
 model User {
   id                  String       @id @default(uuid()) @db.Uuid
   email               String       @unique
@@ -101,6 +107,9 @@ model User {
   profile             UserProfile?
   attributes          UserAttribute[]
   auditLogs           AuditLog[]
+  createdKnowledgeAssets KnowledgeAsset[] @relation("KnowledgeAssetCreatedBy")
+  conversations       Conversation[]
+  messages            Message[]
   createdAt           DateTime     @default(now())
   updatedAt           DateTime     @updatedAt
   deletedAt           DateTime?
@@ -173,6 +182,8 @@ model Company {
   documentMetadatas   DocumentMetadata[]
   chunks              Chunk[]
   embeddings          Embedding[]
+  conversations       Conversation[]
+  messages            Message[]
   createdAt   DateTime     @default(now())
   updatedAt   DateTime     @updatedAt
   deletedAt   DateTime?
@@ -255,6 +266,8 @@ model Workspace {
   company              Company               @relation(fields: [companyId], references: [id], onDelete: Restrict)
   workspaceMemberships WorkspaceMembership[]
   knowledgeBases       KnowledgeBase[]
+  conversations        Conversation[]
+  messages             Message[]
   createdAt            DateTime              @default(now())
   updatedAt            DateTime              @updatedAt
   deletedAt            DateTime?
@@ -370,6 +383,7 @@ model KnowledgeAsset {
   companyId       String               @db.Uuid
   collectionId    String               @db.Uuid
   sourceId        String?              @db.Uuid
+  createdByUserId String?              @db.Uuid
   filename        String
   title           String
   contentType     AssetContentType
@@ -383,6 +397,7 @@ model KnowledgeAsset {
   company         Company              @relation(fields: [companyId], references: [id], onDelete: Restrict)
   collection      Collection           @relation(fields: [collectionId], references: [id], onDelete: Restrict)
   source          KnowledgeSource?     @relation(fields: [sourceId], references: [id], onDelete: SetNull)
+  createdBy       User?                @relation("KnowledgeAssetCreatedBy", fields: [createdByUserId], references: [id], onDelete: SetNull)
   metadata        DocumentMetadata?
   chunks          Chunk[]
   createdAt       DateTime             @default(now())
@@ -391,6 +406,7 @@ model KnowledgeAsset {
 
   @@index([companyId, collectionId, status])
   @@index([sourceId, status])
+  @@index([createdByUserId])
   @@index([checksum])
   @@index([deletedAt])
 }
@@ -456,6 +472,43 @@ model Embedding {
   @@unique([chunkId, provider, model, vectorVersion])
   @@index([companyId, provider, model])
   @@index([chunkId])
+  @@index([deletedAt])
+}
+
+model Conversation {
+  id          String    @id @default(uuid()) @db.Uuid
+  companyId   String    @db.Uuid
+  workspaceId String    @db.Uuid
+  userId      String    @db.Uuid
+  company     Company   @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
+  user        User      @relation(fields: [userId], references: [id], onDelete: Restrict)
+  messages    Message[]
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime?
+
+  @@index([companyId, workspaceId, userId, createdAt])
+  @@index([deletedAt])
+}
+
+model Message {
+  id             String       @id @default(uuid()) @db.Uuid
+  conversationId String       @db.Uuid
+  companyId      String       @db.Uuid
+  workspaceId    String       @db.Uuid
+  userId         String?      @db.Uuid
+  role           MessageRole
+  content        String
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  company        Company      @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  workspace      Workspace    @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
+  user           User?        @relation(fields: [userId], references: [id], onDelete: SetNull)
+  createdAt      DateTime     @default(now())
+  deletedAt      DateTime?
+
+  @@index([conversationId, createdAt])
+  @@index([companyId, workspaceId, createdAt])
   @@index([deletedAt])
 }
 
