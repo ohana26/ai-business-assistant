@@ -162,6 +162,30 @@ export function ChatPage() {
         />
       </Stack>
 
+      <Paper elevation={0} sx={{ p: 2, border: "1px solid", borderColor: "divider" }}>
+        <Stack spacing={0.75}>
+          <Typography variant="subtitle2">What this system is</Typography>
+          <Typography variant="body2" color="text.secondary">
+            This is an AI Business Assistant platform. It answers using your
+            uploaded company knowledge inside the selected company/workspace
+            context.
+          </Typography>
+          <Typography variant="subtitle2" sx={{ mt: 1 }}>
+            General usage
+          </Typography>
+          <Typography variant="body2" color="text.secondary">
+            1) Select or start a conversation, 2) ask normal business questions,
+            3) upload more documents in Knowledge page when context is missing.
+          </Typography>
+          <Typography variant="subtitle2" sx={{ mt: 1 }}>
+            Assistant type: Knowledge Assistant
+          </Typography>
+          <Typography variant="body2" color="text.secondary">
+            Best for policy/procedure/company-doc questions. Responses include
+            sources from retrieved document chunks.
+          </Typography>
+        </Stack>
+      </Paper>
       {!companyId || !workspaceId ? (
         <Alert severity="warning">
           Set company/workspace IDs on Dashboard first.
@@ -247,9 +271,20 @@ export function ChatPage() {
           >
             {messagesQuery.isLoading ? <LinearProgress /> : null}
             {selectedConversationMessages.length === 0 ? (
-              <Typography variant="body2" color="text.secondary">
-                Send a message to start chatting.
-              </Typography>
+              <Stack spacing={1}>
+                <Typography variant="body2" color="text.secondary">
+                  Start with a regular question like:
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  • “Summarize our refund policy”
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  • “What are onboarding steps for new employees?”
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  • “Create a checklist from the uploaded SOP”
+                </Typography>
+              </Stack>
             ) : (
               selectedConversationMessages.map((item) => {
                 const isUser = item.role === "USER";
@@ -290,6 +325,12 @@ export function ChatPage() {
                 minRows={2}
                 value={message}
                 onChange={(event) => setMessage(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" && !event.shiftKey) {
+                    event.preventDefault();
+                    sendMessage();
+                  }
+                }}
                 fullWidth
               />
               <Button
