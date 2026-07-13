@@ -6,6 +6,7 @@ import { useAuthStore } from "../store/authStore";
 
 export function DashboardPage() {
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
+  const user = useAuthStore((state) => state.user);
   const companyId = useWorkspaceStore((state) => state.companyId);
   const workspaceId = useWorkspaceStore((state) => state.workspaceId);
   const collectionId = useWorkspaceStore((state) => state.collectionId);
@@ -26,7 +27,41 @@ export function DashboardPage() {
     <Stack spacing={3}>
       <Paper elevation={0} sx={{ p: 3, border: "1px solid", borderColor: "divider" }}>
         <Stack spacing={1.5}>
-          <Typography variant="h5">Test Cycle Order</Typography>
+          <Typography variant="h5">Welcome</Typography>
+          <Typography variant="body2" color="text.secondary">
+            Your workspace is ready. You can upload knowledge and chat immediately.
+          </Typography>
+          <Stack spacing={0.5}>
+            <Typography variant="body2">
+              <strong>Name:</strong> {user?.displayName || "Not set"}
+            </Typography>
+            <Typography variant="body2">
+              <strong>Email:</strong> {user?.email || "Not available"}
+            </Typography>
+            <Typography variant="body2">
+              <strong>Company ID:</strong> {companyId || "Not available"}
+            </Typography>
+            <Typography variant="body2">
+              <strong>Workspace ID:</strong> {workspaceId || "Not available"}
+            </Typography>
+            <Typography variant="body2">
+              <strong>Default Collection ID:</strong> {collectionId || "Not available"}
+            </Typography>
+          </Stack>
+          <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5}>
+            <Button component={RouterLink} to="/knowledge" variant="outlined">
+              Upload Knowledge
+            </Button>
+            <Button component={RouterLink} to="/chat" variant="outlined">
+              Open Chat
+            </Button>
+          </Stack>
+        </Stack>
+      </Paper>
+
+      <Paper elevation={0} sx={{ p: 3, border: "1px solid", borderColor: "divider" }}>
+        <Stack spacing={1.5}>
+          <Typography variant="h6">Usage order</Typography>
           <Typography variant="body2" color="text.secondary">
             Follow these steps in sequence for full end-to-end testing.
           </Typography>
@@ -43,22 +78,14 @@ export function DashboardPage() {
             <Typography variant="body2">4) Go to Knowledge page and upload a document</Typography>
             <Typography variant="body2">5) Go to Chat page, ask questions, continue same conversation</Typography>
           </Stack>
-          <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5}>
-            <Button component={RouterLink} to="/knowledge" variant="outlined">
-              Step 4: Upload File
-            </Button>
-            <Button component={RouterLink} to="/chat" variant="outlined">
-              Step 5: Chat & Continue
-            </Button>
-          </Stack>
         </Stack>
       </Paper>
 
       <Paper elevation={0} sx={{ p: 3, border: "1px solid", borderColor: "divider" }}>
         <Stack spacing={2}>
-          <Typography variant="h5">Dashboard</Typography>
+          <Typography variant="h6">Context override (optional)</Typography>
           <Typography variant="body2" color="text.secondary">
-            Configure the active company/workspace context used for knowledge and assistant API calls.
+            You usually do not need this. It is available only for advanced/manual overrides.
           </Typography>
           {!hasContext ? (
             <Alert severity="warning">Set company and workspace IDs before testing APIs.</Alert>

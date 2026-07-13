@@ -8,6 +8,10 @@ export class PromptBuilderService {
     workspaceId: string;
     userMessage: string;
     chunks: RetrievedChunk[];
+    conversationHistory: Array<{
+      role: 'USER' | 'ASSISTANT' | 'SYSTEM';
+      content: string;
+    }>;
   }): string {
     const contextText = params.chunks
       .map(
@@ -15,15 +19,24 @@ export class PromptBuilderService {
           `[Chunk ${index + 1} | Asset: ${chunk.assetFilename} | Score: ${chunk.similarityScore.toFixed(4)}]\n${chunk.chunkContent}`,
       )
       .join('\n\n');
+    const historyText = params.conversationHistory
+      .map((message) => `${message.role}: ${message.content}`)
+      .join('\n');
+    const hasContext = params.chunks.length > 0;
 
     return [
       'You are the AI Business Assistant.',
-      'Answer only using the provided context when possible.',
+      'Use provided company context when available.',
+      'If no relevant context exists, clearly say no company knowledge was found and continue as a normal helpful assistant.',
+      'Maintain conversation continuity using prior messages.',
       `Company: ${params.companyId}`,
       `Workspace: ${params.workspaceId}`,
       '',
+      'Conversation history:',
+      historyText || '[No prior messages]',
+      '',
       'Context:',
-      contextText || '[No relevant context found]',
+      hasContext ? contextText : '[No relevant context found]',
       '',
       `User question: ${params.userMessage}`,
       '',

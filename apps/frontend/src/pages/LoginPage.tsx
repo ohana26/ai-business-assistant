@@ -10,7 +10,7 @@ import { useWorkspaceStore } from "../store/workspaceStore";
 export function LoginPage() {
   const navigate = useNavigate();
   const location = useLocation();
-  const setAccessToken = useAuthStore((state) => state.setAccessToken);
+  const setSession = useAuthStore((state) => state.setSession);
   const setContext = useWorkspaceStore((state) => state.setContext);
   const [mode, setMode] = useState<"login" | "register">("login");
   const [displayName, setDisplayName] = useState("");
@@ -22,7 +22,7 @@ export function LoginPage() {
   const loginMutation = useMutation({
     mutationFn: login,
     onSuccess: (data) => {
-      setAccessToken(data.accessToken);
+      setSession({ token: data.accessToken, user: data.user ?? null });
       if (data.onboarding) {
         setContext(data.onboarding);
       }
@@ -40,7 +40,7 @@ export function LoginPage() {
   const registerMutation = useMutation({
     mutationFn: register,
     onSuccess: (data) => {
-      setAccessToken(data.accessToken);
+      setSession({ token: data.accessToken, user: data.user ?? null });
       if (data.onboarding) {
         setContext(data.onboarding);
       }
@@ -127,6 +127,7 @@ export function LoginPage() {
                     value={companyName}
                     onChange={(event) => setCompanyName(event.target.value)}
                     helperText="Your organization/workspace owner account"
+                    required
                   />
                   <TextField
                     label="Workspace Name"
@@ -134,6 +135,7 @@ export function LoginPage() {
                     value={workspaceName}
                     onChange={(event) => setWorkspaceName(event.target.value)}
                     helperText="First workspace for your team"
+                    required
                   />
                 </>
               ) : null}
