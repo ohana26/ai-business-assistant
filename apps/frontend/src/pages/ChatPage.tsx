@@ -186,7 +186,6 @@ export function ChatPage() {
           </Typography>
         </Stack>
       </Paper>
-
       {!companyId || !workspaceId ? (
         <Alert severity="warning">
           Set company/workspace IDs on Dashboard first.
