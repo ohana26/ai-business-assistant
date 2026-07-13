@@ -330,7 +330,6 @@ export class AuthService {
       collectionId: collection.id,
     };
   }
-
   private async ensureDefaultUserRole(tx: Prisma.TransactionClient) {
     const existingRole = await tx.role.findFirst({
       where: {
