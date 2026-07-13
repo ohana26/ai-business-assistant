@@ -1,6 +1,7 @@
 import { create } from "zustand";
 
 const ONBOARDING_STORAGE_KEY = "ai-assistant-onboarding";
+const EMPTY_EMPLOYEES: string[] = [];
 
 type AssistantProfile = {
   assistantName: string;
@@ -140,9 +141,9 @@ export const useOnboardingStore = create<OnboardingData & OnboardingActions>(
     getInvitedEmployees: (companyId, workspaceId) => {
       const key = contextKey(companyId, workspaceId);
       if (!key) {
-        return [];
+        return EMPTY_EMPLOYEES;
       }
-      return get().invitedEmployees[key] ?? [];
+      return get().invitedEmployees[key] ?? EMPTY_EMPLOYEES;
     },
   }),
 );
