@@ -10,7 +10,7 @@ export function DashboardLayout() {
 
       <Box sx={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0 }}>
         <TopNavigation />
-        <Box component="main" sx={{ flex: 1, p: 3 }}>
+        <Box component="main" sx={{ flex: 1, p: { xs: 2, md: 3 } }}>
           <Outlet />
         </Box>
       </Box>
