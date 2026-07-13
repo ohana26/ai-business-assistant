@@ -84,11 +84,11 @@ export function KnowledgePage() {
         <Stack spacing={2}>
           <Typography variant="h5">Knowledge Assets</Typography>
           <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
-            <Typography variant="body2">Step 4 of 5: Upload file and wait for status</Typography>
+            <Typography variant="body2">Upload company documents to train your assistant</Typography>
             <Chip size="small" label={(assetsQuery.data?.items?.length ?? 0) > 0 ? "Assets ready" : "No assets yet"} />
           </Stack>
           {companyId && workspaceId ? null : (
-            <Alert severity="warning">Set company/workspace IDs on Dashboard first.</Alert>
+            <Alert severity="warning">Organization context missing. Complete onboarding first.</Alert>
           )}
           {uploadError ? <Alert severity="error">{String(uploadError)}</Alert> : null}
           <TextField

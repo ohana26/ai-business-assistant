@@ -6,6 +6,8 @@ import { KnowledgePage } from "../pages/KnowledgePage";
 import { ChatPage } from "../pages/ChatPage";
 import { NotFoundPage } from "../pages/NotFoundPage";
 import { ProtectedRoute } from "./ProtectedRoute";
+import { OnboardingRequiredRoute } from "./OnboardingRequiredRoute";
+import { OnboardingPage } from "../pages/OnboardingPage";
 
 export function AppRouter() {
   return (
@@ -15,9 +17,12 @@ export function AppRouter() {
 
       <Route element={<ProtectedRoute />}>
         <Route element={<DashboardLayout />}>
-          <Route path="/dashboard" element={<DashboardPage />} />
-          <Route path="/knowledge" element={<KnowledgePage />} />
-          <Route path="/chat" element={<ChatPage />} />
+          <Route path="/onboarding" element={<OnboardingPage />} />
+          <Route element={<OnboardingRequiredRoute />}>
+            <Route path="/dashboard" element={<DashboardPage />} />
+            <Route path="/knowledge" element={<KnowledgePage />} />
+            <Route path="/chat" element={<ChatPage />} />
+          </Route>
         </Route>
       </Route>
 
