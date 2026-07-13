@@ -1,4 +1,4 @@
 export interface AIProvider {
   generateResponse(prompt: string): Promise<string>;
-  createEmbedding(input: string): Promise<number[]>;
+  getModelName(): string;
 }
