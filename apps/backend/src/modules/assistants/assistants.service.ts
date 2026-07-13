@@ -200,6 +200,23 @@ export class AssistantsService {
         role: userMessage.role,
       },
     });
+
+    const conversationHistory = await this.prisma.message.findMany({
+      where: {
+        conversationId: conversation.id,
+        companyId,
+        workspaceId,
+        deletedAt: null,
+        role: { in: [MessageRole.USER, MessageRole.ASSISTANT] },
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 12,
+      select: {
+        role: true,
+        content: true,
+      },
+    });
+
     const startedAt = Date.now();
     const retrievedChunks = await this.retrievalService.retrieveRelevantChunks(
       companyId,
@@ -211,6 +228,12 @@ export class AssistantsService {
       workspaceId,
       userMessage: params.message,
       chunks: retrievedChunks,
+      conversationHistory: conversationHistory
+        .reverse()
+        .map((message) => ({
+          role: message.role,
+          content: message.content,
+        })),
     });
     const chatProvider = this.aiProvidersService.getChatProvider();
     const answer = await chatProvider.generateResponse(prompt);

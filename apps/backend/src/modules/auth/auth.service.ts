@@ -93,7 +93,7 @@ export class AuthService {
     });
 
     const onboarding = await this.ensureUserTenantContext(user.id, user.email);
-    return this.issueTokensForUser(user, false, onboarding);
+    return this.issueTokensForUser(user, true, onboarding);
   }
 
   async refreshToken(

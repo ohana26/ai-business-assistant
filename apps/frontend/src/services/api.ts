@@ -40,6 +40,11 @@ export type RegisterRequest = {
 };
 
 export type AuthResponse = {
+  user?: {
+    id: string;
+    email: string;
+    displayName: string | null;
+  };
   accessToken: string;
   refreshToken?: string;
   onboarding?: {
