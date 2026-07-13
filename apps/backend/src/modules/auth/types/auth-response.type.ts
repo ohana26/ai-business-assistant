@@ -10,6 +10,11 @@ export type AuthResponse = {
     email: string;
     displayName: string | null;
   };
+  onboarding?: {
+    companyId: string;
+    workspaceId: string;
+    collectionId: string;
+  };
   accessToken: string;
   refreshToken: string;
 };

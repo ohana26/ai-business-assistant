@@ -5,7 +5,7 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
-import { User, UserStatus } from '@prisma/client';
+import { Prisma, User, UserStatus } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 import { randomUUID } from 'crypto';
 import { PrismaService } from '../../database/prisma.service';
@@ -14,6 +14,7 @@ import { LoginDto } from './dto/login.dto';
 import type { JwtUser } from './types/jwt-user.type';
 import type { AuthTokens, AuthResponse } from './types/auth-response.type';
 import { AuditService } from '../audit/audit.service';
+import { RBAC_PERMISSIONS, RBAC_ROLES } from './constants/rbac.constants';
 
 @Injectable()
 export class AuthService {
@@ -51,12 +52,14 @@ export class AuthService {
       },
     });
 
+    const onboarding = await this.provisionDefaultTenantContext(user.id, user.email);
+
     await this.auditService.logUserCreation(user.id, user.id, {
       email: user.email,
       source: 'auth.register',
     });
 
-    return this.issueTokensForUser(user, true);
+    return this.issueTokensForUser(user, true, onboarding);
   }
 
   async login(loginDto: LoginDto): Promise<AuthResponse> {
@@ -152,6 +155,11 @@ export class AuthService {
   private async issueTokensForUser(
     user: Pick<User, 'id' | 'email' | 'displayName'>,
     includeProfile: boolean,
+    onboarding?: {
+      companyId: string;
+      workspaceId: string;
+      collectionId: string;
+    },
   ): Promise<AuthResponse> {
     const tokens = await this.generateTokens(user.id, user.email);
     await this.storeRefreshToken(
@@ -168,9 +176,149 @@ export class AuthService {
             displayName: user.displayName ?? null,
           }
         : undefined,
+      onboarding,
       accessToken: tokens.accessToken,
       refreshToken: tokens.refreshToken,
     };
+  }
+
+  private async provisionDefaultTenantContext(userId: string, email: string) {
+    const emailPrefix = email.split('@')[0] ?? 'company';
+    const baseSlug = this.toSlug(emailPrefix) || 'company';
+    const suffix = randomUUID().slice(0, 8);
+    const companySlug = `${baseSlug}-${suffix}`;
+
+    return this.prisma.$transaction(async (tx) => {
+      const roleId = await this.ensureDefaultUserRole(tx);
+
+      const company = await tx.company.create({
+        data: {
+          name: `${emailPrefix} Company`,
+          slug: companySlug,
+          status: 'ACTIVE',
+        },
+        select: { id: true },
+      });
+
+      const membership = await tx.membership.create({
+        data: {
+          userId,
+          companyId: company.id,
+          roleId,
+          status: 'ACTIVE',
+          joinedAt: new Date(),
+        },
+        select: { id: true },
+      });
+
+      const workspace = await tx.workspace.create({
+        data: {
+          companyId: company.id,
+          name: 'Default Workspace',
+          slug: 'default',
+          description: 'Auto-provisioned workspace for new user onboarding',
+          status: 'ACTIVE',
+        },
+        select: { id: true },
+      });
+
+      await tx.workspaceMembership.create({
+        data: {
+          membershipId: membership.id,
+          workspaceId: workspace.id,
+          workspaceRole: 'MEMBER',
+        },
+      });
+
+      const knowledgeBase = await tx.knowledgeBase.create({
+        data: {
+          companyId: company.id,
+          workspaceId: workspace.id,
+          name: 'Default Knowledge Base',
+          slug: 'default-kb',
+          description: 'Auto-provisioned knowledge base for manual uploads',
+          status: 'ACTIVE',
+        },
+        select: { id: true },
+      });
+
+      const collection = await tx.collection.create({
+        data: {
+          companyId: company.id,
+          knowledgeBaseId: knowledgeBase.id,
+          name: 'General',
+          slug: 'general',
+          description: 'Default collection for uploaded documents',
+          status: 'ACTIVE',
+        },
+        select: { id: true },
+      });
+
+      return {
+        companyId: company.id,
+        workspaceId: workspace.id,
+        collectionId: collection.id,
+      };
+    });
+  }
+
+  private async ensureDefaultUserRole(tx: Prisma.TransactionClient) {
+    const existingRole = await tx.role.findFirst({
+      where: {
+        companyId: null,
+        name: RBAC_ROLES.USER,
+        isSystemRole: true,
+        deletedAt: null,
+      },
+      select: { id: true },
+    });
+    if (existingRole) {
+      return existingRole.id;
+    }
+
+    const requiredPermissionKeys = [
+      RBAC_PERMISSIONS.KNOWLEDGE_UPLOAD,
+      RBAC_PERMISSIONS.KNOWLEDGE_VIEW,
+      RBAC_PERMISSIONS.ASSISTANT_CHAT,
+    ];
+
+    for (const key of requiredPermissionKeys) {
+      await tx.permission.upsert({
+        where: { key },
+        update: {},
+        create: { key, description: key },
+      });
+    }
+
+    const role = await tx.role.create({
+      data: {
+        name: RBAC_ROLES.USER,
+        description: 'USER default role',
+        isSystemRole: true,
+      },
+      select: { id: true },
+    });
+
+    const permissions = await tx.permission.findMany({
+      where: { key: { in: requiredPermissionKeys } },
+      select: { id: true },
+    });
+    await tx.rolePermission.createMany({
+      data: permissions.map((permission) => ({
+        roleId: role.id,
+        permissionId: permission.id,
+      })),
+      skipDuplicates: true,
+    });
+
+    return role.id;
+  }
+
+  private toSlug(value: string) {
+    return value
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '');
   }
 
   private async generateTokens(
