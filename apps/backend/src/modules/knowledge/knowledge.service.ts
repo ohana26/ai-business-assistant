@@ -20,6 +20,7 @@ import type { CurrentUserContext } from '../auth/types/current-user-context.type
 import type { StorageProvider } from '../storage/interfaces/storage-provider.interface';
 import { STORAGE_PROVIDER_TOKEN } from '../storage/storage.constants';
 import { UploadKnowledgeAssetDto } from './dto/upload-knowledge-asset.dto';
+import { ListKnowledgeAssetsDto } from './dto/list-knowledge-assets.dto';
 import { KnowledgeIngestionService } from './services/knowledge-ingestion.service';
 import type { UploadedKnowledgeFile } from './types/uploaded-knowledge-file.type';
 
@@ -32,6 +33,119 @@ export class KnowledgeService {
     @Inject(STORAGE_PROVIDER_TOKEN)
     private readonly storageProvider: StorageProvider,
   ) {}
+
+  async listKnowledgeAssets(
+    userContext: CurrentUserContext,
+    companyId: string | undefined,
+    workspaceId: string | undefined,
+    query: ListKnowledgeAssetsDto,
+  ) {
+    if (!companyId) {
+      throw new BadRequestException('x-company-id header is required');
+    }
+    if (!workspaceId) {
+      throw new BadRequestException('x-workspace-id header is required');
+    }
+
+    const companyAccess = userContext.companies.find(
+      (company) => company.companyId === companyId,
+    );
+    if (!companyAccess) {
+      throw new ForbiddenException(
+        'User is not a member of the provided company',
+      );
+    }
+    if (!companyAccess.permissions.includes(RBAC_PERMISSIONS.KNOWLEDGE_VIEW)) {
+      throw new ForbiddenException('Missing required permissions');
+    }
+
+    const [user, workspaceMembership] = await Promise.all([
+      this.prisma.user.findFirst({
+        where: {
+          id: userContext.userId,
+          status: UserStatus.ACTIVE,
+          deletedAt: null,
+        },
+        select: { id: true },
+      }),
+      this.prisma.workspaceMembership.findFirst({
+        where: {
+          membershipId: companyAccess.membershipId,
+          deletedAt: null,
+          workspaceId,
+          membership: {
+            status: MembershipStatus.ACTIVE,
+            deletedAt: null,
+          },
+          workspace: {
+            companyId,
+            status: 'ACTIVE',
+            deletedAt: null,
+          },
+        },
+        select: { id: true },
+      }),
+    ]);
+    if (!user) {
+      throw new ForbiddenException('User is not active');
+    }
+    if (!workspaceMembership) {
+      throw new ForbiddenException(
+        'User does not have active access to the requested workspace',
+      );
+    }
+
+    const assets = await this.prisma.knowledgeAsset.findMany({
+      where: {
+        companyId,
+        status: query.status,
+        deletedAt: null,
+        collection: {
+          deletedAt: null,
+          knowledgeBase: {
+            workspaceId,
+            deletedAt: null,
+          },
+        },
+      },
+      orderBy: {
+        createdAt: 'desc',
+      },
+      include: {
+        source: {
+          select: { name: true },
+        },
+        _count: {
+          select: { chunks: true },
+        },
+      },
+    });
+
+    await this.auditService.log({
+      companyId,
+      userId: userContext.userId,
+      action: 'knowledge.asset.viewed',
+      resourceType: 'knowledge.asset',
+      metadata: {
+        workspaceId,
+        status: query.status ?? null,
+        returnedCount: assets.length,
+      },
+    });
+
+    return {
+      items: assets.map((asset) => ({
+        id: asset.id,
+        title: asset.title,
+        filename: asset.filename,
+        source: asset.source?.name ?? null,
+        status: asset.status,
+        chunksCount: asset._count.chunks,
+        uploadedAt: asset.createdAt.toISOString(),
+        sizeBytes: asset.sizeBytes?.toString() ?? '0',
+      })),
+    };
+  }
 
   async uploadKnowledgeAsset(
     userContext: CurrentUserContext,
@@ -166,6 +280,7 @@ export class KnowledgeService {
             companyId,
             collectionId: collection.id,
             sourceId: dto.sourceId,
+            createdByUserId: userContext.userId,
             filename: safeFilename,
             title: safeFilename,
             contentType: this.mapContentType(file),
@@ -215,6 +330,10 @@ export class KnowledgeService {
     }
 
     try {
+      await this.prisma.knowledgeAsset.update({
+        where: { id: createdAsset.id },
+        data: { status: KnowledgeAssetStatus.PROCESSING },
+      });
       await this.knowledgeIngestionService.ingestUploadedAsset(
         this.storageProvider,
         createdAsset.id,

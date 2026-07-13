@@ -3,6 +3,7 @@ import {
   Controller,
   Get,
   Headers,
+  Query,
   Post,
   UploadedFile,
   UseGuards,
@@ -23,6 +24,7 @@ import { CurrentUserContextGuard } from '../auth/guards/current-user-context.gua
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import type { CurrentUserContext as CurrentUserContextType } from '../auth/types/current-user-context.type';
 import { UploadKnowledgeAssetDto } from './dto/upload-knowledge-asset.dto';
+import { ListKnowledgeAssetsDto } from './dto/list-knowledge-assets.dto';
 import type { UploadedKnowledgeFile } from './types/uploaded-knowledge-file.type';
 import { RequirePermission } from '../permissions/decorators/require-permission.decorator';
 import { PermissionsGuard } from '../permissions/permissions.guard';
@@ -35,17 +37,35 @@ export class KnowledgeController {
   constructor(private readonly knowledgeService: KnowledgeService) {}
 
   @ApiOperation({
-    summary: 'View knowledge content',
-    description: 'Requires permission: knowledge.view',
+    summary: 'List workspace knowledge assets',
+    description:
+      'Requires knowledge.view permission and explicit company/workspace context headers.',
   })
-  @Get()
+  @ApiHeader({
+    name: 'x-company-id',
+    required: true,
+    description: 'Company context for tenant isolation',
+  })
+  @ApiHeader({
+    name: 'x-workspace-id',
+    required: true,
+    description: 'Workspace context for tenant isolation',
+  })
+  @Get('assets')
   @UseGuards(JwtAuthGuard, CurrentUserContextGuard, PermissionsGuard)
   @RequirePermission(RBAC_PERMISSIONS.KNOWLEDGE_VIEW)
-  getKnowledge(@CurrentUserContext() userContext: CurrentUserContextType) {
-    return {
-      message: 'Knowledge view endpoint placeholder',
+  listKnowledgeAssets(
+    @CurrentUserContext() userContext: CurrentUserContextType,
+    @Headers('x-company-id') companyId: string | undefined,
+    @Headers('x-workspace-id') workspaceId: string | undefined,
+    @Query() query: ListKnowledgeAssetsDto,
+  ) {
+    return this.knowledgeService.listKnowledgeAssets(
       userContext,
-    };
+      companyId,
+      workspaceId,
+      query,
+    );
   }
 
   @ApiOperation({
