@@ -140,7 +140,6 @@ export class AssistantsService {
         role: userMessage.role,
       },
     });
-
     const startedAt = Date.now();
     const retrievedChunks = await this.retrievalService.retrieveRelevantChunks(
       params.companyId,
@@ -180,7 +179,6 @@ export class AssistantsService {
         role: assistantMessage.role,
       },
     });
-
     await this.auditService.log({
       companyId: params.companyId,
       userId: params.userContext.userId,
