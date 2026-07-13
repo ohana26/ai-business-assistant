@@ -48,6 +48,18 @@ async function bootstrap() {
     ],
   });
 
+  app.enableCors({
+    origin: true,
+    credentials: true,
+    methods: ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE', 'OPTIONS'],
+    allowedHeaders: [
+      'Content-Type',
+      'Authorization',
+      'x-company-id',
+      'x-workspace-id',
+    ],
+  });
+
   const swaggerConfig = new DocumentBuilder()
     .setTitle('Enterprise AI Knowledge Platform API')
     .setDescription('Backend API documentation')
