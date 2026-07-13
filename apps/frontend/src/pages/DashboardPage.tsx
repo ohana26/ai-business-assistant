@@ -13,7 +13,7 @@ import { Link as RouterLink } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { useWorkspaceStore } from "../store/workspaceStore";
 import { useAuthStore } from "../store/authStore";
-import { fetchAssistantConversations, fetchKnowledgeAssets } from "../services/api";
+import { fetchAssistantConversations, fetchKnowledgeAssets } from "../api";
 import { useOnboardingStore } from "../store/onboardingStore";
 
 export function DashboardPage() {
@@ -79,7 +79,7 @@ export function DashboardPage() {
             <Button component={RouterLink} to="/knowledge" variant="outlined">
               Manage Knowledge
             </Button>
-            <Button component={RouterLink} to="/chat" variant="outlined">
+            <Button component={RouterLink} to="/assistant" variant="outlined">
               Open Assistant Chat
             </Button>
           </Stack>

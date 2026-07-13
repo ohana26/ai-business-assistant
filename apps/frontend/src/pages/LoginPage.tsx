@@ -3,17 +3,15 @@ import { Alert, Box, Button, Paper, Stack, Tab, Tabs, TextField, Typography } fr
 import { useMutation } from "@tanstack/react-query";
 import { useLocation, useNavigate } from "react-router-dom";
 import { AxiosError } from "axios";
-import { login, register } from "../services/api";
+import { login, register } from "../api";
 import { useAuthStore } from "../store/authStore";
 import { useWorkspaceStore } from "../store/workspaceStore";
-import { useOnboardingStore } from "../store/onboardingStore";
 
 export function LoginPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const setSession = useAuthStore((state) => state.setSession);
   const setContext = useWorkspaceStore((state) => state.setContext);
-  const hasCompletedOnboarding = useOnboardingStore((state) => state.isCompleted);
   const [mode, setMode] = useState<"login" | "register">("login");
   const [displayName, setDisplayName] = useState("");
   const [companyName, setCompanyName] = useState("");
@@ -24,17 +22,13 @@ export function LoginPage() {
   const loginMutation = useMutation({
     mutationFn: login,
     onSuccess: (data) => {
-      setSession({ token: data.accessToken, user: data.user ?? null });
+      setSession({
+        token: data.accessToken,
+        refreshToken: data.refreshToken ?? null,
+        user: data.user ?? null,
+      });
       if (data.onboarding) {
         setContext(data.onboarding);
-      }
-      const context = data.onboarding ?? {
-        companyId: useWorkspaceStore.getState().companyId,
-        workspaceId: useWorkspaceStore.getState().workspaceId,
-      };
-      if (!hasCompletedOnboarding(context.companyId, context.workspaceId)) {
-        navigate("/onboarding", { replace: true });
-        return;
       }
       const nextPath =
         typeof location.state === "object" &&
@@ -42,7 +36,7 @@ export function LoginPage() {
         "from" in location.state &&
         typeof location.state.from === "string"
           ? location.state.from
-          : "/dashboard";
+          : "/assistant";
       navigate(nextPath, { replace: true });
     },
   });
@@ -50,11 +44,15 @@ export function LoginPage() {
   const registerMutation = useMutation({
     mutationFn: register,
     onSuccess: (data) => {
-      setSession({ token: data.accessToken, user: data.user ?? null });
+      setSession({
+        token: data.accessToken,
+        refreshToken: data.refreshToken ?? null,
+        user: data.user ?? null,
+      });
       if (data.onboarding) {
         setContext(data.onboarding);
       }
-      navigate("/onboarding", { replace: true });
+      navigate("/assistant", { replace: true });
     },
   });
 
