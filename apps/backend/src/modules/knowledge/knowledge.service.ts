@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   ForbiddenException,
+  HttpException,
   Inject,
   Injectable,
   InternalServerErrorException,
@@ -322,10 +323,14 @@ export class KnowledgeService {
           collectionId: dto.collectionId,
         },
       });
-    } catch {
+    } catch (error) {
       await this.storageProvider.delete(storagePath).catch(() => undefined);
+      const message =
+        error instanceof Error
+          ? error.message
+          : 'Failed to persist uploaded asset';
       throw new InternalServerErrorException(
-        'Failed to persist uploaded asset',
+        `Failed to persist uploaded asset: ${message}`,
       );
     }
 
@@ -349,12 +354,21 @@ export class KnowledgeService {
           storagePath: true,
         },
       });
-    } catch {
+    } catch (error) {
       await this.prisma.knowledgeAsset.update({
         where: { id: createdAsset.id },
         data: { status: KnowledgeAssetStatus.FAILED },
       });
-      throw new InternalServerErrorException('Failed to ingest uploaded asset');
+      if (error instanceof HttpException) {
+        throw error;
+      }
+      const message =
+        error instanceof Error
+          ? error.message
+          : 'Failed to ingest uploaded asset';
+      throw new InternalServerErrorException(
+        `Failed to ingest uploaded asset: ${message}`,
+      );
     }
 
     return {
