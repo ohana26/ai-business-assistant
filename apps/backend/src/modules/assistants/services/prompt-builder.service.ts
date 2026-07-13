@@ -12,6 +12,19 @@ export class PromptBuilderService {
       role: 'USER' | 'ASSISTANT' | 'SYSTEM';
       content: string;
     }>;
+    userMemories: Array<{
+      type: string;
+      content: string;
+      importance: number;
+      createdAt: string;
+    }>;
+    assistantProfile: {
+      name: string;
+      systemPrompt: string;
+      behaviorConfig: unknown;
+      personalPrompt: string | null;
+      preferences: unknown;
+    };
   }): string {
     const contextText = params.chunks
       .map(
@@ -22,9 +35,23 @@ export class PromptBuilderService {
     const historyText = params.conversationHistory
       .map((message) => `${message.role}: ${message.content}`)
       .join('\n');
+    const memoriesText = params.userMemories
+      .map(
+        (memory, index) =>
+          `[Memory ${index + 1} | Type: ${memory.type} | Importance: ${memory.importance} | CreatedAt: ${memory.createdAt}]\n${memory.content}`,
+      )
+      .join('\n\n');
     const hasContext = params.chunks.length > 0;
+    const profileBehaviorText = params.assistantProfile.behaviorConfig
+      ? JSON.stringify(params.assistantProfile.behaviorConfig)
+      : '{}';
+    const profilePreferencesText = params.assistantProfile.preferences
+      ? JSON.stringify(params.assistantProfile.preferences)
+      : '{}';
 
     return [
+      `Assistant name: ${params.assistantProfile.name}`,
+      params.assistantProfile.systemPrompt,
       'You are an enterprise AI assistant for internal company knowledge.',
       'Follow these non-negotiable rules:',
       '1) Answer ONLY using the retrieved company knowledge context.',
@@ -35,9 +62,15 @@ export class PromptBuilderService {
       '6) Use conversation history only for user intent continuity; do not treat it as authoritative company knowledge unless it appears in retrieved chunks.',
       `Company: ${params.companyId}`,
       `Workspace: ${params.workspaceId}`,
+      `Assistant behavior config: ${profileBehaviorText}`,
+      `User preferences: ${profilePreferencesText}`,
+      `User personal prompt: ${params.assistantProfile.personalPrompt ?? '[None]'}`,
       '',
       'Conversation history:',
       historyText || '[No prior messages]',
+      '',
+      'User memory context:',
+      memoriesText || '[No relevant user memories found]',
       '',
       'Context:',
       hasContext ? contextText : '[No relevant context found]',
