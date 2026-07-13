@@ -10,4 +10,6 @@ export const appConfig = registerAs('app', () => ({
     process.env.JWT_REFRESH_SECRET ?? 'change-me-refresh-secret',
   jwtAccessExpiresIn: process.env.JWT_ACCESS_EXPIRES_IN ?? '15m',
   jwtRefreshExpiresIn: process.env.JWT_REFRESH_EXPIRES_IN ?? '7d',
+  storageProvider: process.env.STORAGE_PROVIDER ?? 'local',
+  storagePath: process.env.STORAGE_PATH ?? './storage',
 }));

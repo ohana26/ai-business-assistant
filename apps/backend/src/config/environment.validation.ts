@@ -47,6 +47,14 @@ class EnvironmentVariables {
   @IsString()
   @Matches(/^\d+[smhd]$/i)
   JWT_REFRESH_EXPIRES_IN!: string;
+
+  @IsString()
+  @IsIn(['local', 's3', 'azure-blob', 'private-cloud'])
+  STORAGE_PROVIDER!: string;
+
+  @IsString()
+  @IsNotEmpty()
+  STORAGE_PATH!: string;
 }
 
 export function validateEnvironment(
