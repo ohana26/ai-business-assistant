@@ -7,10 +7,8 @@ import { useWorkspaceStore } from "../../store/workspaceStore";
 export function TopNavigation() {
   const navigate = useNavigate();
   const clearAuth = useAuthStore((state) => state.clearAuth);
-  const { companyId, workspaceId } = useWorkspaceStore((state) => ({
-    companyId: state.companyId,
-    workspaceId: state.workspaceId,
-  }));
+  const companyId = useWorkspaceStore((state) => state.companyId);
+  const workspaceId = useWorkspaceStore((state) => state.workspaceId);
 
   const handleLogout = () => {
     clearAuth();

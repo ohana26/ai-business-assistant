@@ -36,14 +36,10 @@ function formatBytes(bytesAsString: string): string {
 
 export function KnowledgePage() {
   const queryClient = useQueryClient();
-  const { companyId, workspaceId, collectionId, setContext } = useWorkspaceStore(
-    (state) => ({
-      companyId: state.companyId,
-      workspaceId: state.workspaceId,
-      collectionId: state.collectionId,
-      setContext: state.setContext,
-    }),
-  );
+  const companyId = useWorkspaceStore((state) => state.companyId);
+  const workspaceId = useWorkspaceStore((state) => state.workspaceId);
+  const collectionId = useWorkspaceStore((state) => state.collectionId);
+  const setContext = useWorkspaceStore((state) => state.setContext);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [uploadProgress, setUploadProgress] = useState<number>(0);
   const [collectionInput, setCollectionInput] = useState(collectionId);
