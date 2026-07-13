@@ -110,6 +110,8 @@ model User {
   createdKnowledgeAssets KnowledgeAsset[] @relation("KnowledgeAssetCreatedBy")
   conversations       Conversation[]
   messages            Message[]
+  memories            UserMemory[]
+  userAssistantProfiles UserAssistantProfile[]
   createdAt           DateTime     @default(now())
   updatedAt           DateTime     @updatedAt
   deletedAt           DateTime?
@@ -184,6 +186,8 @@ model Company {
   embeddings          Embedding[]
   conversations       Conversation[]
   messages            Message[]
+  userMemories        UserMemory[]
+  assistantProfiles   AssistantProfile[]
   createdAt   DateTime     @default(now())
   updatedAt   DateTime     @updatedAt
   deletedAt   DateTime?
@@ -510,6 +514,51 @@ model Message {
   @@index([conversationId, createdAt])
   @@index([companyId, workspaceId, createdAt])
   @@index([deletedAt])
+}
+
+model UserMemory {
+  id         String   @id @default(uuid()) @db.Uuid
+  userId     String   @db.Uuid
+  companyId  String   @db.Uuid
+  type       String
+  content    String
+  importance Int      @default(1)
+  user       User     @relation(fields: [userId], references: [id], onDelete: Restrict)
+  company    Company  @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([userId, companyId, createdAt])
+  @@index([companyId, type])
+  @@index([importance])
+}
+
+model AssistantProfile {
+  id               String                 @id @default(uuid()) @db.Uuid
+  companyId        String                 @db.Uuid
+  name             String
+  systemPrompt     String
+  behaviorConfig   Json?
+  company          Company                @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  userAssignments  UserAssistantProfile[]
+  createdAt        DateTime               @default(now())
+  updatedAt        DateTime               @updatedAt
+
+  @@index([companyId, createdAt])
+}
+
+model UserAssistantProfile {
+  userId             String           @db.Uuid
+  assistantProfileId String           @db.Uuid
+  personalPrompt     String?
+  preferences        Json?
+  user               User             @relation(fields: [userId], references: [id], onDelete: Restrict)
+  assistantProfile   AssistantProfile @relation(fields: [assistantProfileId], references: [id], onDelete: Cascade)
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+
+  @@id([userId, assistantProfileId])
+  @@index([assistantProfileId])
 }
 
 /// Approved additions (future phases, intentionally not implemented now):

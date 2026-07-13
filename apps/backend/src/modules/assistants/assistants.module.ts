@@ -7,6 +7,7 @@ import { AuditModule } from '../audit/audit.module';
 import { AiProvidersModule } from '../ai-providers/ai-providers.module';
 import { KnowledgeModule } from '../knowledge/knowledge.module';
 import { PromptBuilderService } from './services/prompt-builder.service';
+import { MemoryService } from './services/memory.service';
 
 @Module({
   imports: [
@@ -17,6 +18,6 @@ import { PromptBuilderService } from './services/prompt-builder.service';
     KnowledgeModule,
   ],
   controllers: [AssistantsController],
-  providers: [AssistantsService, PromptBuilderService],
+  providers: [AssistantsService, PromptBuilderService, MemoryService],
 })
 export class AssistantsModule {}

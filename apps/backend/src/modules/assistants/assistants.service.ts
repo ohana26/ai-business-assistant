@@ -10,6 +10,7 @@ import type { CurrentUserContext } from '../auth/types/current-user-context.type
 import { AiProvidersService } from '../ai-providers/ai-providers.service';
 import { RetrievalService } from '../knowledge/services/retrieval.service';
 import { PromptBuilderService } from './services/prompt-builder.service';
+import { MemoryService } from './services/memory.service';
 
 @Injectable()
 export class AssistantsService {
@@ -19,6 +20,7 @@ export class AssistantsService {
     private readonly promptBuilderService: PromptBuilderService,
     private readonly aiProvidersService: AiProvidersService,
     private readonly auditService: AuditService,
+    private readonly memoryService: MemoryService,
   ) {}
 
   async listConversations(params: {
@@ -217,6 +219,11 @@ export class AssistantsService {
         content: true,
       },
     });
+    const memoryContext = await this.memoryService.getMemoryContext({
+      userId: params.userContext.userId,
+      companyId,
+      message: params.message,
+    });
 
     const startedAt = Date.now();
     const retrievalStartedAt = Date.now();
@@ -245,6 +252,8 @@ export class AssistantsService {
         role: message.role,
         content: message.content,
       })),
+      userMemories: memoryContext.memories,
+      assistantProfile: memoryContext.assistantProfile,
     });
     const promptCharacterCount = prompt.length;
     const promptEstimatedTokens = Math.ceil(promptCharacterCount / 4);
@@ -314,6 +323,8 @@ export class AssistantsService {
         promptEstimatedTokens,
         retrievalSettings,
         documentsUsed,
+        memoryCount: memoryContext.memories.length,
+        assistantProfileId: memoryContext.assistantProfile.id,
         retrievalError,
         retrievedChunks: retrievedChunks.map((chunk) => ({
           chunkId: chunk.chunkId,
@@ -339,6 +350,11 @@ export class AssistantsService {
       })),
     };
 
+    await this.memoryService.captureMemoryFromUserMessage({
+      userId: params.userContext.userId,
+      companyId,
+      message: params.message,
+    });
     if (!params.debug) {
       return response;
     }
@@ -347,6 +363,12 @@ export class AssistantsService {
       ...response,
       debug: {
         retrievalSettings,
+        memory: {
+          count: memoryContext.memories.length,
+          assistantProfileId: memoryContext.assistantProfile.id,
+          assistantProfileName: memoryContext.assistantProfile.name,
+          items: memoryContext.memories,
+        },
         prompt: {
           characterCount: promptCharacterCount,
           estimatedTokens: promptEstimatedTokens,
