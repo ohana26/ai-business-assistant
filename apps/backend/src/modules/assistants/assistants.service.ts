@@ -218,11 +218,20 @@ export class AssistantsService {
     });
 
     const startedAt = Date.now();
-    const retrievedChunks = await this.retrievalService.retrieveRelevantChunks(
-      companyId,
-      workspaceId,
-      params.message,
-    );
+    let retrievedChunks = [] as Awaited<
+      ReturnType<RetrievalService['retrieveRelevantChunks']>
+    >;
+    let retrievalError: string | null = null;
+    try {
+      retrievedChunks = await this.retrievalService.retrieveRelevantChunks(
+        companyId,
+        workspaceId,
+        params.message,
+      );
+    } catch (error) {
+      retrievalError =
+        error instanceof Error ? error.message : 'Unknown retrieval error';
+    }
     const prompt = this.promptBuilderService.buildPrompt({
       companyId,
       workspaceId,
@@ -279,6 +288,7 @@ export class AssistantsService {
         workspaceId,
         model: chatProvider.getModelName(),
         latency,
+        retrievalError,
         retrievedChunks: retrievedChunks.map((chunk) => ({
           chunkId: chunk.chunkId,
           assetId: chunk.assetId,
