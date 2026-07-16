@@ -1,12 +1,50 @@
+@import "tailwindcss";
+
 * {
   box-sizing: border-box;
 }
 
-html,
+html {
+  scroll-behavior: smooth;
+}
+
 body,
 #root {
   margin: 0;
   min-height: 100%;
   width: 100%;
-  font-family: "Inter", "Roboto", "Helvetica", "Arial", sans-serif;
+  font-family: "Inter", "Segoe UI", system-ui, -apple-system, sans-serif;
+  background: #020617;
+}
+
+.glass-panel {
+  @apply rounded-2xl border border-slate-800/80 bg-slate-900/55 backdrop-blur-xl;
+}
+
+.section-glow {
+  @apply transition duration-300 hover:border-emerald-400/40 hover:shadow-[0_0_28px_rgba(16,185,129,0.22)];
+}
+
+.nav-link {
+  @apply rounded-full border border-transparent px-3 py-1.5 text-sm text-slate-300 transition hover:border-slate-700/90 hover:text-emerald-300;
+}
+
+.section-title {
+  @apply text-2xl font-semibold tracking-tight text-slate-50 md:text-3xl;
+}
+
+.hero-cta {
+  @apply items-center gap-2 rounded-full border border-emerald-500/60 bg-emerald-500/15 px-6 py-3 text-sm font-semibold text-emerald-200 shadow-[0_0_20px_rgba(16,185,129,0.25)] transition hover:-translate-y-0.5 hover:bg-emerald-500/25;
+}
+
+.form-label {
+  @apply flex flex-col gap-2 text-sm font-medium text-slate-200;
+}
+
+.form-input {
+  @apply rounded-xl border border-slate-700/80 bg-slate-900/80 px-4 py-2.5 text-slate-100 outline-none transition placeholder:text-slate-500 focus:border-emerald-400/70 focus:ring-2 focus:ring-emerald-500/30;
+}
+
+.social-link {
+  @apply inline-flex items-center gap-2 rounded-xl border border-slate-700/80 bg-slate-900/80 px-3 py-2 text-sm text-slate-200 transition hover:border-indigo-400/60 hover:text-indigo-200;
 }
