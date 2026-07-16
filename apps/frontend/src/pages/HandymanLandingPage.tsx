@@ -1,59 +1,78 @@
 import { useEffect } from "react";
 
+const PHONE_NUMBER = "+972501234567";
+const WHATSAPP_NUMBER = "972501234567";
+
 const services = [
   {
-    title: "הרכבת רהיטים",
-    description: "איקאה, ארונות, שידות ומיטות בצורה מדויקת, יציבה ובטוחה לאורך זמן.",
+    title: "צביעת קירות וחידוש חללים",
+    description: "צביעה נקייה ומדויקת לקירות, תיקוני צבע וגימור אסתטי לבית ולמשרד.",
+    image:
+      "https://images.unsplash.com/photo-1562259929-b4e1fd3aef09?auto=format&fit=crop&w=1200&q=80",
+    icon: "🎨",
+  },
+  {
+    title: "התקנת והרכבת רהיטים",
+    description:
+      "הרכבת ארונות, שידות, כונניות ומיטות בצורה מדויקת, יציבה ובטוחה לאורך זמן.",
     image:
       "https://images.unsplash.com/photo-1581578731548-c64695cc6952?auto=format&fit=crop&w=1200&q=80",
     icon: "🪛",
   },
   {
+    title: "פירוק, פינוי וסידור מחדש",
+    description:
+      "מפרקים רהיטים קיימים, מפנים בצורה מסודרת ומשאירים מקום נקי לפרויקט הבא.",
+    image:
+      "https://images.unsplash.com/photo-1484154218962-a197022b5858?auto=format&fit=crop&w=1200&q=80",
+    icon: "📦",
+  },
+  {
+    title: "בניית מיטות עץ בהתאמה אישית",
+    description:
+      "מתכננים ובונים מיטות עץ חזקות ויפות בהתאמה מלאה למידות ולסגנון שלכם.",
+    image:
+      "https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?auto=format&fit=crop&w=1200&q=80",
+    icon: "🛏️",
+  },
+  {
     title: "תלייה מקצועית",
     description:
-      "טלוויזיות על כל סוגי הקירות כולל גבס, מדפים, מראות, תאורה ותמונות בדיוק מושלם.",
+      "טלוויזיות, מדפים, מראות ותמונות על כל סוגי הקירות כולל גבס ובטון.",
     image:
-      "https://images.unsplash.com/photo-1481277542470-605612bd2d61?auto=format&fit=crop&w=1200&q=80",
+      "https://images.unsplash.com/photo-1593359677879-a4bb92f829d1?auto=format&fit=crop&w=1200&q=80",
     icon: "📺",
   },
   {
-    title: "תיקונים כלליים וצבע",
+    title: "תיקונים כלליים בבית",
     description:
-      "סתימת חורים, צביעת קירות, החלפת מנעולים וידיות, החלפת ברזים ותיקוני אינסטלציה קלים.",
+      "תיקונים קטנים שמייצרים הבדל גדול: ידיות, ברזים, מנעולים, כיוונים וגימורים.",
     image:
-      "https://images.unsplash.com/photo-1505691938895-1758d7feb511?auto=format&fit=crop&w=1200&q=80",
-    icon: "🎨",
-  },
-  {
-    title: "פתרונות בהתאמה אישית",
-    description:
-      "זקוקים למשהו מיוחד? אנחנו ניידים, יצירתיים ומוצאים פתרון לכל בעיה בבית.",
-    image:
-      "https://images.unsplash.com/photo-1556912172-45b7abe8b7e1?auto=format&fit=crop&w=1200&q=80",
+      "https://images.unsplash.com/photo-1621905251918-48416bd8575a?auto=format&fit=crop&w=1200&q=80",
     icon: "🧰",
   },
 ];
 
 const portfolio = [
   {
-    title: "תליית טלוויזיה מדויקת בסלון",
+    title: "צביעת קיר דגש נקייה ומדויקת",
     image:
-      "https://images.unsplash.com/photo-1593359677879-a4bb92f829d1?auto=format&fit=crop&w=1200&q=80",
+      "https://images.unsplash.com/photo-1562259949-e8e7689d7828?auto=format&fit=crop&w=1200&q=80",
   },
   {
-    title: "הרכבת ארון מודרני חדש",
+    title: "הרכבת ארון מודרני בבית לקוח",
     image:
       "https://images.unsplash.com/photo-1617104551722-3b2d5136649e?auto=format&fit=crop&w=1200&q=80",
   },
   {
-    title: "צביעת קיר דגש בסלון",
+    title: "פירוק ופינוי רהיטים בצורה מסודרת",
     image:
-      "https://images.unsplash.com/photo-1615529162924-f8605388461d?auto=format&fit=crop&w=1200&q=80",
+      "https://images.unsplash.com/photo-1570129477492-45c003edd2be?auto=format&fit=crop&w=1200&q=80",
   },
   {
-    title: "תליית גלריית מסגרות ומדפים",
+    title: "בניית מיטת עץ בעבודת יד",
     image:
-      "https://images.unsplash.com/photo-1616627561839-074385245ff6?auto=format&fit=crop&w=1200&q=80",
+      "https://images.unsplash.com/photo-1505693314120-0d443867891c?auto=format&fit=crop&w=1200&q=80",
   },
 ];
 
@@ -88,7 +107,7 @@ export function HandymanLandingPage() {
         <div className="mx-auto flex w-full max-w-6xl items-center justify-between px-4 py-3 sm:px-6">
           <p className="text-base font-bold text-slate-900">רז וחן – הנדימן</p>
           <a
-            href="tel:+972501234567"
+            href={`tel:${PHONE_NUMBER}`}
             className="inline-flex items-center gap-2 rounded-full bg-sky-700 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-sky-800"
           >
             <span aria-hidden>📞</span>
@@ -100,8 +119,8 @@ export function HandymanLandingPage() {
       <main>
         <section className="relative isolate overflow-hidden">
           <img
-            src="https://images.unsplash.com/photo-1621905252507-b35492cc74b4?auto=format&fit=crop&w=1920&q=80"
-            alt="הנדימן מקצועי עם כלי עבודה בדירה מודרנית"
+            src="https://images.unsplash.com/photo-1621905251918-48416bd8575a?auto=format&fit=crop&w=1920&q=80"
+            alt="רז וחן עובדים בשטח על צביעה והתקנות בבית מודרני"
             className="absolute inset-0 h-full w-full object-cover"
           />
           <div className="absolute inset-0 bg-slate-950/70" />
@@ -118,7 +137,7 @@ export function HandymanLandingPage() {
             </p>
             <div className="mt-7 grid grid-cols-1 gap-3 sm:grid-cols-2 sm:max-w-xl">
               <a
-                href="https://wa.me/972501234567"
+                href={`https://wa.me/${WHATSAPP_NUMBER}`}
                 target="_blank"
                 rel="noreferrer"
                 className="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-500 px-5 py-3 text-sm font-bold text-white shadow-lg shadow-emerald-800/20 transition hover:bg-emerald-600"
@@ -127,7 +146,7 @@ export function HandymanLandingPage() {
                 שלחו לנו הודעה בוואטסאפ
               </a>
               <a
-                href="tel:+972501234567"
+                href={`tel:${PHONE_NUMBER}`}
                 className="inline-flex items-center justify-center gap-2 rounded-xl bg-sky-600 px-5 py-3 text-sm font-bold text-white shadow-lg shadow-sky-900/20 transition hover:bg-sky-700"
               >
                 <span aria-hidden>📞</span>
@@ -139,7 +158,7 @@ export function HandymanLandingPage() {
 
         <section className="mx-auto max-w-6xl px-4 py-14 sm:px-6 sm:py-16">
           <h2 className="text-2xl font-extrabold text-slate-900 sm:text-3xl">אזור השירותים שלנו</h2>
-          <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {services.map((service) => (
               <article
                 key={service.title}
@@ -170,11 +189,12 @@ export function HandymanLandingPage() {
                 נקודה שתצטרכו.
               </p>
             </div>
-            <div className="rounded-2xl border-2 border-dashed border-slate-300 bg-slate-50 p-8 text-center">
-              <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-slate-200 text-2xl">
-                👷
-              </div>
-              <p className="mt-4 text-lg font-semibold text-slate-800">כאן תבוא תמונה של רז וחן מהשטח</p>
+            <div className="overflow-hidden rounded-2xl border border-slate-200 shadow-sm">
+              <img
+                src="https://images.unsplash.com/photo-1621905252472-e8ed52e332f0?auto=format&fit=crop&w=1200&q=80"
+                alt="רז וחן בעבודה בשטח"
+                className="h-full min-h-72 w-full object-cover"
+              />
             </div>
           </div>
         </section>
@@ -211,7 +231,7 @@ export function HandymanLandingPage() {
             <h2 className="text-2xl font-extrabold sm:text-3xl">יש לכם פרויקט בשבילנו? דברו איתנו עכשיו!</h2>
             <div className="mx-auto mt-6 grid max-w-xl grid-cols-1 gap-3 sm:grid-cols-2">
               <a
-                href="https://wa.me/972501234567"
+                href={`https://wa.me/${WHATSAPP_NUMBER}`}
                 target="_blank"
                 rel="noreferrer"
                 className="rounded-xl bg-emerald-500 px-4 py-3 text-sm font-bold text-white transition hover:bg-emerald-600"
@@ -219,7 +239,7 @@ export function HandymanLandingPage() {
                 שלחו הודעה בוואטסאפ
               </a>
               <a
-                href="tel:+972501234567"
+                href={`tel:${PHONE_NUMBER}`}
                 className="rounded-xl bg-sky-500 px-4 py-3 text-sm font-bold text-white transition hover:bg-sky-600"
               >
                 התקשרו עכשיו
@@ -235,7 +255,7 @@ export function HandymanLandingPage() {
 
       <div className="fixed right-3 bottom-3 z-50 flex w-[calc(100%-1.5rem)] gap-2 sm:hidden">
         <a
-          href="https://wa.me/972501234567"
+          href={`https://wa.me/${WHATSAPP_NUMBER}`}
           target="_blank"
           rel="noreferrer"
           className="flex-1 rounded-full bg-emerald-500 px-4 py-3 text-center text-sm font-bold text-white shadow-lg"
@@ -243,7 +263,7 @@ export function HandymanLandingPage() {
           וואטסאפ
         </a>
         <a
-          href="tel:+972501234567"
+          href={`tel:${PHONE_NUMBER}`}
           className="flex-1 rounded-full bg-sky-600 px-4 py-3 text-center text-sm font-bold text-white shadow-lg"
         >
           חיוג
