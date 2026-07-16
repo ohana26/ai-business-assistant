@@ -10,11 +10,12 @@ import { OnboardingPage } from "../pages/OnboardingPage";
 import { MemoryPage } from "../pages/MemoryPage";
 import { AdminUsersPage } from "../pages/AdminUsersPage";
 import { AdminAssistantPage } from "../pages/AdminAssistantPage";
+import { HandymanLandingPage } from "../pages/HandymanLandingPage";
 
 export function AppRouter() {
   return (
     <Routes>
-      <Route path="/" element={<Navigate to="/assistant" replace />} />
+      <Route path="/" element={<HandymanLandingPage />} />
       <Route path="/login" element={<LoginPage />} />
 
       <Route element={<ProtectedRoute />}>
