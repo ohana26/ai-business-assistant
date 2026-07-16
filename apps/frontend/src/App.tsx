@@ -2,12 +2,12 @@ import { useEffect, useMemo, useState } from "react";
 import {
   ArrowUpRight,
   Globe,
-  Linkedin,
   Mail,
   MessageCircle,
   Phone,
   Workflow,
 } from "lucide-react";
+import { FaLinkedin } from "react-icons/fa";
 
 type Language = "en" | "he";
 
@@ -445,7 +445,7 @@ function App() {
                 className="social-link"
                 aria-label="LinkedIn profile"
               >
-                <Linkedin size={18} />
+                <FaLinkedin size={18} />
                 linkedin.com/in/chen-ochana
               </a>
               <a
