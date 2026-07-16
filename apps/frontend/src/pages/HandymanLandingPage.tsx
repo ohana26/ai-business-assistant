@@ -2,6 +2,11 @@ import { useEffect } from "react";
 
 const PHONE_NUMBER = "+972501234567";
 const WHATSAPP_NUMBER = "972501234567";
+const WHATSAPP_TEXT =
+  "היי רז וחן, הגעתי מהאתר ואשמח לקבל הצעת מחיר לשירות הנדימן.";
+const WHATSAPP_LINK = `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(
+  WHATSAPP_TEXT,
+)}`;
 
 const services = [
   {
@@ -137,7 +142,7 @@ export function HandymanLandingPage() {
             </p>
             <div className="mt-7 grid grid-cols-1 gap-3 sm:grid-cols-2 sm:max-w-xl">
               <a
-                href={`https://wa.me/${WHATSAPP_NUMBER}`}
+                href={WHATSAPP_LINK}
                 target="_blank"
                 rel="noreferrer"
                 className="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-500 px-5 py-3 text-sm font-bold text-white shadow-lg shadow-emerald-800/20 transition hover:bg-emerald-600"
@@ -231,7 +236,7 @@ export function HandymanLandingPage() {
             <h2 className="text-2xl font-extrabold sm:text-3xl">יש לכם פרויקט בשבילנו? דברו איתנו עכשיו!</h2>
             <div className="mx-auto mt-6 grid max-w-xl grid-cols-1 gap-3 sm:grid-cols-2">
               <a
-                href={`https://wa.me/${WHATSAPP_NUMBER}`}
+                href={WHATSAPP_LINK}
                 target="_blank"
                 rel="noreferrer"
                 className="rounded-xl bg-emerald-500 px-4 py-3 text-sm font-bold text-white transition hover:bg-emerald-600"
@@ -255,7 +260,7 @@ export function HandymanLandingPage() {
 
       <div className="fixed right-3 bottom-3 z-50 flex w-[calc(100%-1.5rem)] gap-2 sm:hidden">
         <a
-          href={`https://wa.me/${WHATSAPP_NUMBER}`}
+          href={WHATSAPP_LINK}
           target="_blank"
           rel="noreferrer"
           className="flex-1 rounded-full bg-emerald-500 px-4 py-3 text-center text-sm font-bold text-white shadow-lg"
